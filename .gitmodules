@@ -1,0 +1,3 @@
+[submodule "ecat2"]
+	path = ecat2
+	url = https://github.com/paulscherrerinstitute/ecat2.git
