@@ -1,0 +1,14 @@
+{
+  "slave0": {
+    "sm2": {
+      "pdo_index": "0x1600",
+      "entry_index": "0x7000",
+      "size_bytes": 62
+    },
+    "sm3": {
+      "pdo_index": "0x1A00",
+      "entry_index": "0x6000",
+      "size_bytes": 234
+    }
+  }
+}

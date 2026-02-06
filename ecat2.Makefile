@@ -64,6 +64,7 @@ USR_DBFLAGS += -I $(APPDB)
 USR_LDFLAGS += -L /opt/etherlab/lib/
 USR_LDFLAGS += -Wl,-rpath,/opt/etherlab/lib
 USR_LDFLAGS += -Wl,--no-as-needed -lethercat
+USR_LDFLAGS += -Wl,--no-as-needed -ljansson
 
 .PHONY: vlibs
 vlibs:
