@@ -61,8 +61,9 @@ SCRIPTS += $(wildcard ../iocsh/*.iocsh)
 USR_DBFLAGS += -I . -I ..
 USR_DBFLAGS += -I $(EPICS_BASE)/db
 USR_DBFLAGS += -I $(APPDB)
-USR_LDFLAGS += -L /opt/opt/etherlab/lib/
-USR_LDFLAGS += -lethercat
+USR_LDFLAGS += -L /opt/etherlab/lib/
+USR_LDFLAGS += -Wl,-rpath,/opt/etherlab/lib
+USR_LDFLAGS += -Wl,--no-as-needed -lethercat
 
 .PHONY: vlibs
 vlibs:
