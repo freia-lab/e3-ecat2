@@ -1,0 +1,30 @@
+Bullet‑proof configurator/diagnostic (multi‑slave, validations, offsets)
+ecat_cfgdiag.c
+======================
+What this tool does:
+
+Programs PDOs for each slave:
+SM2 → size_bytes 8‑bit entries at entry_index (e.g., 0x7000)
+SM3 → same (e.g., 0x6000)
+Builds one domain and registers every entry across all slaves
+Prints offset/bit per entry (byte‑packed; all 8‑bit), total domain size,
+and runs unit‑test checks:
+
+bit position must be 0 for each byte entry
+offsets must be contiguous and start at 0
+domain size must equal number of entries (296 for 62+234)
+
+If anything is off (e.g., JSON sizes wrong), the tool fails fast with
+a clear message.
+
+=======================
+Unit test mode
+The validations printed at the end act as a basic unit test for mapping.
+If you want a “pure test” run without printing offsets, you can
+add --sleep 0 or pipe to less. The test will fail if layout doesn’t
+match what we expect for 8‑bit entries.
+
+=======================
+Run instructions
+sudo ./ecat_cfgdiag ./ecat_pdo_config.json --sleep 3
+

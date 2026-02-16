@@ -17,3 +17,6 @@ testMods*/
 pv.list
 dbl
 .iocsh_history
+
+# repo specific
+tools/*.o
