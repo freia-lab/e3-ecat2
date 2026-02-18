@@ -1,31 +1,10 @@
 {
-  "defaults": {
-    "vendor_id": "0x0000006c",
-    "product_code": "0x0000a72c",
-    "max_bytes_per_direction": 250
-  },
-  "slaves": [
-    {
-      "alias": 0,
-      "position": 0,
-
-      "sm2": { "pdo_index": "0x1600", "entry_index": "0x7000", "size_bytes": 62 },
-      "sm3": { "pdo_index": "0x1A00", "entry_index": "0x6000", "size_bytes": 234 }
-    }
-  ],
   "fields": {
     "slave0": {
-      "sm2": [
-        { "name": "psu_on_req_low",  "offset": 0,  "type": "u8" },
-        { "name": "psu_on_req_high", "offset": 1,  "type": "u8" },
-        { "name": "psu_off_req_low", "offset": 2,  "type": "u8" },
-        { "name": "psu_off_req_high","offset": 3,  "type": "u8" },
-        { "name": "amp_onoff_req",   "offset": 4,  "type": "u8" },
-        { "name": "rf_onoff_req",    "offset": 5,  "type": "u8" }
-      ],
       "sm3": [
-        { "name": "general_status_1", "offset": 0,  "type": "u8" },
-        { "name": "general_status_2", "offset": 1,  "type": "u8" }
+        { "name": "Example_Field1", "offset": 0,  "type": "u8"  },
+        { "name": "Example_Field2", "offset": 10, "type": "u16" },
+        { "name": "Example_Field3", "offset": 20, "type": "u32" }
       ]
     }
   }
