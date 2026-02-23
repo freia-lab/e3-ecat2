@@ -500,7 +500,7 @@ static unsigned int off_3001_31;
 static unsigned int off_2000_2f;
 static unsigned int off_3001_32;
 
-static ec_pdo_entry_reg_t domain_regs[] = {
+static ec_pdo_entry_reg_t domain0_regs[] = {
     {0, 0, VENDOR_ID, PRODUCT_CODE, 0x2000, 0x01, &off_2000_01, NULL},
     {0, 0, VENDOR_ID, PRODUCT_CODE, 0x2000, 0x02, &off_2000_02, NULL},
     {0, 0, VENDOR_ID, PRODUCT_CODE, 0x2000, 0x03, &off_2000_03, NULL},
@@ -751,6 +751,9 @@ static ec_pdo_entry_reg_t domain_regs[] = {
     {0, 0, VENDOR_ID, PRODUCT_CODE, 0x2001, 0x30, &off_2001_30, NULL},
     {0, 0, VENDOR_ID, PRODUCT_CODE, 0x2001, 0x31, &off_2001_31, NULL},
     {0, 0, VENDOR_ID, PRODUCT_CODE, 0x2001, 0x32, &off_2001_32, NULL},
+    {0}
+};
+static ec_pdo_entry_reg_t domain1_regs[] = {
     {0, 0, VENDOR_ID, PRODUCT_CODE, 0x3000, 0x01, &off_3000_01, NULL},
     {0, 0, VENDOR_ID, PRODUCT_CODE, 0x3000, 0x02, &off_3000_02, NULL},
     {0, 0, VENDOR_ID, PRODUCT_CODE, 0x3000, 0x03, &off_3000_03, NULL},

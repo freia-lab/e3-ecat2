@@ -15,10 +15,13 @@
 #define NSEC_PER_SEC 1000000000
 
 static ec_master_t *master = NULL;
-static ec_domain_t *domain = NULL;
-static ec_slave_config_t *sc = NULL;
+static ec_domain_t *domain0 = NULL; // For Outputs (SM2)
+static ec_domain_t *domain1 = NULL; // For Inputs (SM3)
 
-static uint8_t *domain_pd = NULL;
+static uint8_t *domain0_pd = NULL;
+static uint8_t *domain1_pd = NULL;
+
+static ec_slave_config_t *sc = NULL;
 
 static volatile int run = 1;
 
@@ -568,11 +571,11 @@ void timespec_add(struct timespec *t, uint64_t addtime)
 
 int main(void)
 {
-#define MAX_DIAG_PERIOD 10000 // 10s
+#define MAX_DIAG_PERIOD 1000 // 10s
   struct timespec wakeup_time;
-  const uint32_t cycle_ns = 1000000; // 1 ms
+  const uint32_t cycle_ns = 10000000; // 10 ms
   int counter = 0;
-  ec_domain_state_t ds;  
+  ec_domain_state_t ds0, ds1;  
   ec_master_state_t ms;
   
 #include "domain_regs.h"
@@ -588,10 +591,11 @@ int main(void)
     return -1;
   }
 
-  /* Create Domain */
-  domain = ecrt_master_create_domain(master);
+  /* Create Domains */
+  domain0 = ecrt_master_create_domain(master);
+  domain1 = ecrt_master_create_domain(master);
 
-  if (!domain) {
+  if (!domain0 || !domain1) {
     fprintf(stderr, "Failed to create domain.\n");
     return -1;
   }
@@ -616,15 +620,19 @@ int main(void)
   if (ecrt_slave_config_dc(sc,
 			   0x0300,        // AssignActivate
 			   cycle_ns,      // Sync0 cycle time
-			   440000,             // Sync0 shift
+			   440000,        // Sync0 shift
 			   0, 0)) {       // Sync1 disabled
     fprintf(stderr, "Failed to configure DC.\n");
     return -1;
   }
 
   /* Register PDO entries */
-  if (ecrt_domain_reg_pdo_entry_list(domain, domain_regs)) {
-    fprintf(stderr, "PDO entry registration failed!\n");
+  if (ecrt_domain_reg_pdo_entry_list(domain0, domain0_regs)) {
+    fprintf(stderr, "PDO entry registration for domain0 failed!\n");
+    return -1;
+  } 
+  if (ecrt_domain_reg_pdo_entry_list(domain1, domain1_regs)) {
+    fprintf(stderr, "PDO entry registration for domain1 failed!\n");
     return -1;
   } 
 
@@ -634,13 +642,19 @@ int main(void)
     return -1;
   }
 
-  domain_pd = ecrt_domain_data(domain);
-  if (!domain_pd) {
-    fprintf(stderr, "Domain data pointer is NULL!\n");
+  domain0_pd = ecrt_domain_data(domain0);
+  if (!domain0_pd) {
+    fprintf(stderr, "Domain0 data pointer is NULL!\n");
+    return -1;
+  }
+  domain1_pd = ecrt_domain_data(domain1);
+  if (!domain1_pd) {
+    fprintf(stderr, "Domain1 data pointer is NULL!\n");
     return -1;
   }
 
-  printf("Domain size: %zu\n", ecrt_domain_size(domain));
+  printf("Domain0 size: %zu\n", ecrt_domain_size(domain0));
+  printf("Domain1 size: %zu\n", ecrt_domain_size(domain1));
 
   clock_gettime(CLOCK_MONOTONIC, &wakeup_time);
 
@@ -654,7 +668,8 @@ int main(void)
 
     /* Receive */
     ecrt_master_receive(master);
-    ecrt_domain_process(domain);
+    ecrt_domain_process(domain0);
+    ecrt_domain_process(domain1);
 
     /* Application time (REQUIRED in 1.6.x) */
     struct timespec now;
@@ -668,18 +683,21 @@ int main(void)
 
     // Read  index 0x3000:01 (the first input byte)
     // Use the EC_READ macros for safe access
-    uint8_t value = EC_READ_U8(domain_pd + off_3000_01);
+    uint8_t value = EC_READ_U8(domain1_pd + off_3000_01);
  
     /* Send */
-    ecrt_domain_queue(domain);
+    ecrt_domain_queue(domain0);
+    ecrt_domain_queue(domain1);
     ecrt_master_send(master);
 
     /* Add some diagnostic */
     if (counter++ > MAX_DIAG_PERIOD) {
       counter = 0;
       printf("Input Byte 0 Value: 0x%02X\n", value);
-      ecrt_domain_state(domain, &ds);
-      printf("Domain WKC: %u, state: %u\n", ds.working_counter, ds.wc_state);
+      ecrt_domain_state(domain0, &ds0);
+      printf("Domain0 WKC: %u, state: %u\n", ds0.working_counter, ds0.wc_state);
+      ecrt_domain_state(domain1, &ds1);
+      printf("Domain1 WKC: %u, state: %u\n", ds1.working_counter, ds1.wc_state);
       ecrt_master_state(master, &ms);
       printf("Master al_states: %u, slaves: %u, link_up: %u\n",
 	     ms.al_states, ms.slaves_responding, ms.link_up);
