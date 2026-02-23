@@ -38,6 +38,10 @@ ecat_dump_raw: ecat_dump_raw.o
 	$(CC) $^ -o $@ -lncurses \
         $(LDFLAGS) $(LDLIBS)
 
+ecat_minimal: ecat_minimal.o
+	$(CC) $^ -o $@ -lncurses \
+        $(LDFLAGS) $(LDLIBS)
+
 clean:
 	rm -f *.o $(BIN)
 
