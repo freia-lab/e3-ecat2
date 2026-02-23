@@ -571,7 +571,7 @@ void timespec_add(struct timespec *t, uint64_t addtime)
 
 int main(void)
 {
-#define MAX_DIAG_PERIOD 1000 // 10s
+#define MAX_DIAG_PERIOD 100 // 1s
   struct timespec wakeup_time;
   const uint32_t cycle_ns = 10000000; // 10 ms
   int counter = 0;
@@ -609,7 +609,7 @@ int main(void)
     return -1;
   }
 
-  /* IMPORTANT: DO NOT CONFIG PDO MAPPING */
+  /* IMPORTANT: DO NOT CHANGE PDO MAPPING */
     if (ecrt_slave_config_pdos(sc, EC_END, slave_0_syncs)) {
     fprintf(stderr, "Failed to configure PDOs.\n");
     return -1;
@@ -683,7 +683,11 @@ int main(void)
 
     // Read  index 0x3000:01 (the first input byte)
     // Use the EC_READ macros for safe access
-    uint8_t value = EC_READ_U8(domain1_pd + off_3000_01);
+    uint8_t gen_stat0 = EC_READ_U8(domain1_pd + off_3000_01);
+    uint8_t gen_stat1 = EC_READ_U8(domain1_pd + off_3000_02);
+    uint16_t roof_fan_speed =  EC_READ_U16(domain1_pd + off_3000_05);
+    uint16_t fan_left1_speed =  EC_READ_U16(domain1_pd + off_3000_09);
+    uint16_t fan_left2_speed =  EC_READ_U16(domain1_pd + off_3000_0b);
  
     /* Send */
     ecrt_domain_queue(domain0);
@@ -693,7 +697,11 @@ int main(void)
     /* Add some diagnostic */
     if (counter++ > MAX_DIAG_PERIOD) {
       counter = 0;
-      printf("Input Byte 0 Value: 0x%02X\n", value);
+      printf("genStat0: 0x%02X, genStat1: 0x%02X\n", gen_stat0, gen_stat1);
+      printf("Fan speed: roof: %u, left 1: %u, left 2: %u\n",
+	     roof_fan_speed, fan_left1_speed, fan_left2_speed);
+      
+#ifdef DEBUG
       ecrt_domain_state(domain0, &ds0);
       printf("Domain0 WKC: %u, state: %u\n", ds0.working_counter, ds0.wc_state);
       ecrt_domain_state(domain1, &ds1);
@@ -701,6 +709,7 @@ int main(void)
       ecrt_master_state(master, &ms);
       printf("Master al_states: %u, slaves: %u, link_up: %u\n",
 	     ms.al_states, ms.slaves_responding, ms.link_up);
+#endif //DEBUG
     }
   }
   

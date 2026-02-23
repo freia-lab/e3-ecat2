@@ -23,7 +23,7 @@ else
   LDLIBS  := -lethercat $(JANSSON_LIBS)
 endif
 
-BIN := ecat_cfgdiag
+BIN := ecat_cfgdiag ecat_liveviewer ecat_dump_raw ecat_minimal
 
 all: $(BIN)
 
