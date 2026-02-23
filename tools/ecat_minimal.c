@@ -4,6 +4,7 @@
 #include <time.h>
 #include <ecrt.h>
 
+
 /*****************************************************************************/
 /* Master 0, Slave 0                                                         */
 /*****************************************************************************/
@@ -657,7 +658,7 @@ int main(void)
   printf("Domain1 size: %zu\n", ecrt_domain_size(domain1));
 
   clock_gettime(CLOCK_MONOTONIC, &wakeup_time);
-
+  
   printf("Starting cyclic task...\n");
 
   while (run) {
@@ -681,6 +682,9 @@ int main(void)
     ecrt_master_sync_reference_clock(master);
     ecrt_master_sync_slave_clocks(master);
 
+    //    uint16_t remote  = 0xbbbb;
+    // EC_WRITE_U16(domain0_pd + off_2000_3d, remote);
+    
     // Read  index 0x3000:01 (the first input byte)
     // Use the EC_READ macros for safe access
     uint8_t gen_stat0 = EC_READ_U8(domain1_pd + off_3000_01);
