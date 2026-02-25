@@ -20,3 +20,4 @@ dbl
 
 # repo specific
 tools/*.o
+tools/ecat_minimal
