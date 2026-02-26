@@ -572,12 +572,17 @@ void timespec_add(struct timespec *t, uint64_t addtime)
 
 int main(void)
 {
+#define LOCAL 0xaaaa
+#define REMOTE 0xbbbb
+  
 #define MAX_DIAG_PERIOD 100 // 1s
   struct timespec wakeup_time;
   const uint32_t cycle_ns = 10000000; // 10 ms
   int counter = 0;
   ec_domain_state_t ds0, ds1;  
   ec_master_state_t ms;
+  uint16_t loopcounter = 0;
+  uint16_t remote = 0;
   
 #include "domain_regs.h"
   
@@ -618,6 +623,9 @@ int main(void)
   
 
   /* Distributed Clocks Configuration */
+    
+#if ECRT_VERSION_MAJOR > 1 || \
+   (ECRT_VERSION_MAJOR == 1 && ECRT_VERSION_MINOR >= 6)
   if (ecrt_slave_config_dc(sc,
 			   0x0300,        // AssignActivate
 			   cycle_ns,      // Sync0 cycle time
@@ -626,6 +634,13 @@ int main(void)
     fprintf(stderr, "Failed to configure DC.\n");
     return -1;
   }
+#else
+  ecrt_slave_config_dc(sc,
+		       0x0300,        // AssignActivate
+		       cycle_ns,      // Sync0 cycle time
+		       440000,        // Sync0 shift
+		       0, 0);
+#endif
 
   /* Register PDO entries */
   if (ecrt_domain_reg_pdo_entry_list(domain0, domain0_regs)) {
@@ -682,9 +697,23 @@ int main(void)
     ecrt_master_sync_reference_clock(master);
     ecrt_master_sync_slave_clocks(master);
 
-    //    uint16_t remote  = 0xbbbb;
-    // EC_WRITE_U16(domain0_pd + off_2000_3d, remote);
+    /* Specific write test for IBA SSA - keep alive word and toggling Remote/Local */
     
+    uint16_t hrtbeat  = loopcounter++;
+    EC_WRITE_U16(domain0_pd + off_2000_3b, hrtbeat);
+
+    if (loopcounter > 1000 && loopcounter < 1010)
+      remote  = REMOTE;
+    else if (loopcounter > 2000 && loopcounter < 2010)
+      remote  = LOCAL;
+    else
+      remote = 0;
+    
+    EC_WRITE_U16(domain0_pd + off_2000_3d, remote);
+
+    /* End of IPA SSA write test */
+
+
     // Read  index 0x3000:01 (the first input byte)
     // Use the EC_READ macros for safe access
     uint8_t gen_stat0 = EC_READ_U8(domain1_pd + off_3000_01);
@@ -701,7 +730,7 @@ int main(void)
     /* Add some diagnostic */
     if (counter++ > MAX_DIAG_PERIOD) {
       counter = 0;
-      printf("genStat0: 0x%02X, genStat1: 0x%02X\n", gen_stat0, gen_stat1);
+      printf("loop_counter: %u, genStat0: 0x%02X, genStat1: 0x%02X\n", loopcounter, gen_stat0, gen_stat1);
       printf("Fan speed: roof: %u, left 1: %u, left 2: %u\n",
 	     roof_fan_speed, fan_left1_speed, fan_left2_speed);
       

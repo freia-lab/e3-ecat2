@@ -1,3 +1,24 @@
+diff --git devethercat.c devethercat.c
+index bf8a7da..c19d1bd 100644
+--- devethercat.c
++++ devethercat.c
+@@ -1180,7 +1180,7 @@ static int init_aa( devethercat_private *priv, aaiRecord *record, RECTYPE rectyp
+ 
+ 
+ #define PARSE_IO_STR( rtype, inout )                                                                         \
+-reclink = &((rtype##Record *)record)->inout;                                                               \
++reclink = &((rtype##Record *)record)->inout;									\
+ if( dev_parse_io_string( priv, record, rectype, reclink ) != OK )                                            \
+ {                                                                                                            \
+ 	errlogSevPrintf( errlogFatal, "%s: Parsing INP/OUT link '%s' failed (record %s, type %s)\n", __func__,   \
+@@ -1201,6 +1201,7 @@ long dev_init_record(
+   			boffs[32] = { 0 }, blen[32] = { 0 }, *msg;
+   	RECTYPE rectype = dev_get_record_type( record, &ix );
+ 	FN_CALLED;
++        errlogSevPrintf( errlogInfo, "%s: record %s of type '%s'\n", __func__, record->name, rectypes[ix].recname );
+ 
+   	if( rectype == REC_ERROR )
+     {
 diff --git drvethercat.c drvethercat.c
 index 12c2054..cafdaec 100644
 --- drvethercat.c
@@ -35,6 +56,19 @@ index 12c2054..cafdaec 100644
  
  
  
+diff --git eccfg.c eccfg.c
+index 1c70c90..f2719c2 100644
+--- eccfg.c
++++ eccfg.c
+@@ -32,7 +32,7 @@
+ 
+ ecnode *ecroot = NULL;
+ /*------------------------------------------------------------------- */
+-#define PRINT_PHYS_CONFIG 0
++#define PRINT_PHYS_CONFIG 1
+ 
+ int master_create_physical_config( ecnode *m )
+ {
 diff --git ecengine.c ecengine.c
 index 6929166..2d31119 100644
 --- ecengine.c

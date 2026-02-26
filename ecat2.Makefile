@@ -25,9 +25,9 @@ EXCLUDE_ARCHS += linux-corei7-poky
 # Since this file (ecat2.Makefile) is copied into
 # the module directory at build-time, these paths have to be relative
 # to that path
-APP := ecat2App
-APPDB := $(APP)/Db
-APPSRC := $(APP)/src
+#APP := ecat2App
+#APPDB := $(APP)/Db
+#APPSRC := $(APP)/src
 
 # If you have files to include, you will generally want to include these, e.g.
 #
@@ -41,6 +41,8 @@ TEMPLATES += $(wildcard $(APPDB)/*.proto)
 TEMPLATES += $(wildcard $(APPDB)/*.template)
 
 SCRIPTS += $(wildcard ../iocsh/*.iocsh)
+
+DBDS += drvethercat.dbd
 
 # Note that architecture-specific source files can be specified:
 #
