@@ -1006,3 +1006,5 @@ static ec_pdo_entry_reg_t domain1_regs[] = {
     {0, 0, VENDOR_ID, PRODUCT_CODE, 0x3001, 0x32, &off_3001_32, NULL},
     {0}
 };
+
+int iba_ssaConfigure(ec_master_t *master);
