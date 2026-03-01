@@ -51,6 +51,10 @@ ecat_dual_domain_pdo: ecat_dual_domain_pdo.o
 	$(CC) $^ -o $@ -lncurses \
         $(LDFLAGS) $(LDLIBS)
 
+ecat_dual_gen: ecat_dual_gen.o pdo_map_gen.o
+	$(CC) $^ -o $@ -lncurses \
+        $(LDFLAGS) $(LDLIBS)
+
 ecat_dual: ecat_dual.o pdo_map.o
 	$(CC) $^ -o $@ -lncurses \
         $(LDFLAGS) $(LDLIBS)

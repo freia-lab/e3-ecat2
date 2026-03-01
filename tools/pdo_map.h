@@ -1,98 +1,55 @@
+// pdo_map.h — minimal helper for CIFX RE/ECS (uniform U8 ranges, fixed mapping)
 #pragma once
-#include <stdint.h>
-#include <stddef.h>
 #include <ecrt.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 
-// -------- Profiles you can choose at runtime ----------
-typedef enum {
-    PDO_PROFILE_BASIC = 0,  // your CIFX mapping: 200+50 OUT, 200+50 IN (all U8)
-    PDO_PROFILE_FAN16,      // demo: selected fields as true U16s
-    PDO_PROFILE_BITS32      // demo: bit-level entries (1-bit signals)
-} pdo_profile_t;
+// Device IDs (keep strict to avoid mismatches)
+#define DEV_VENDOR_ID     0x0000006c
+#define DEV_PRODUCT_CODE  0x0000a72c
 
-// -------- Named signals your app can reference ----------
-typedef enum {
-    SIG_HEARTBEAT = 0,      // OUT: heartbeat
-    SIG_REMOTE_LOCAL,       // OUT: control word (REMOTE/LOCAL)
-    SIG_GEN_STAT0,          // IN : general status 0 (U8)
-    SIG_GEN_STAT1,          // IN : general status 1 (U8)
-    SIG_ROOF_FAN_SPEED,     // IN : roof fan (often U16)
-    SIG_FAN_LEFT1_SPEED,    // IN : left fan 1 (U16)
-    SIG_FAN_LEFT2_SPEED,    // IN : left fan 2 (U16)
-    SIG__COUNT
-} pdo_signal_id_t;
+// Default PDO extents from your device:
+//   Rx: 0x1600 (200 x 8-bit, 0x2000:01..C8) + 0x1601 (50 x 8-bit, 0x2001:01..32)
+//   Tx: 0x1A00 (200 x 8-bit, 0x3000:01..C8) + 0x1A01 (50 x 8-bit, 0x3001:01..32)
+#define OUT_2000_COUNT 200
+#define OUT_2001_COUNT  50
+#define IN_3000_COUNT  200
+#define IN_3001_COUNT   50
 
-// Direction helper
-typedef enum { MAP_DIR_OUT = 0, MAP_DIR_IN = 1 } map_dir_t;
-
-// -------- Map object you manage per application -----------
-typedef struct pdo_map_s {
-    // Chosen profile
-    pdo_profile_t profile;
-
-    // --- Internal: PDO description arrays kept alive until activation ---
-    // RxPDO (outputs to slave → SM2)
-    ec_pdo_entry_info_t *rx_a_entries; size_t rx_a_count; uint16_t rx_a_pdo_idx; // e.g., 0x1600
-    ec_pdo_entry_info_t *rx_b_entries; size_t rx_b_count; uint16_t rx_b_pdo_idx; // e.g., 0x1601
+typedef struct {
+    // PDO entry arrays (kept alive until after activation)
+    ec_pdo_entry_info_t *rx1600, *rx1601; // outputs
+    ec_pdo_entry_info_t *tx1a00, *tx1a01; // inputs
     ec_pdo_info_t rx_pdos[2];
-
-    // TxPDO (inputs from slave → SM3)
-    ec_pdo_entry_info_t *tx_a_entries; size_t tx_a_count; uint16_t tx_a_pdo_idx; // e.g., 0x1A00
-    ec_pdo_entry_info_t *tx_b_entries; size_t tx_b_count; uint16_t tx_b_pdo_idx; // e.g., 0x1A01
     ec_pdo_info_t tx_pdos[2];
+    ec_sync_info_t *syncs;
 
-    ec_sync_info_t *syncs; // SM0..SM3 (+ terminator)
+    // Registration lists (NULL‑terminated arrays)
+    ec_pdo_entry_reg_t *regs_out;
+    ec_pdo_entry_reg_t *regs_in;
 
-    // --- Internal: registration lists for domains (NULL-terminated) ---
-    ec_pdo_entry_reg_t *regs_out; size_t regs_out_count;
-    ec_pdo_entry_reg_t *regs_in;  size_t regs_in_count;
-
-    // --- Offsets captured by registration (arrays owned by this map) ---
-    unsigned int *off_out_a; size_t off_out_a_count; // mirrors rx_a_entries
-    unsigned int *off_out_b; size_t off_out_b_count; // mirrors rx_b_entries
-    unsigned int *off_in_a;  size_t off_in_a_count;  // mirrors tx_a_entries
-    unsigned int *off_in_b;  size_t off_in_b_count;  // mirrors tx_b_entries
-
-    // Optional bit positions (only used for bit-level entries)
-    unsigned int *bitpos_out_a; unsigned int *bitpos_out_b;
-    unsigned int *bitpos_in_a;  unsigned int *bitpos_in_b;
-
-    // Named signal registry (filled per profile)
-    struct {
-        const char  *name;
-        map_dir_t    dir;
-        uint16_t     index;
-        uint8_t      sub;
-        uint8_t      bits;        // length (8/16/32 or 1 for bit)
-        // Resolved after registration:
-        unsigned int *offset_ptr; // points into the off_* arrays
-        unsigned int *bitpos_ptr; // optional (only for bits)
-    } signals[SIG__COUNT];
+    // Offsets for each entry (domain-local byte offsets)
+    unsigned int off_out_2000[OUT_2000_COUNT];
+    unsigned int off_out_2001[OUT_2001_COUNT];
+    unsigned int off_in_3000[IN_3000_COUNT];
+    unsigned int off_in_3001[IN_3001_COUNT];
 } pdo_map_t;
 
+// Build mapping (matches device’s fixed PDOs) and inform master config.
+// Returns 0 on success, non‑zero on failure.
+int pdo_map_build_and_apply(ec_slave_config_t *sc, pdo_map_t *m);
 
-// ========= API =============
+// Register PDO entries into two domains (SM2 → domain_out, SM3 → domain_in).
+// Returns 0 on success, non‑zero on failure.
+int pdo_map_register(pdo_map_t *m,
+                     ec_domain_t *domain_out, ec_domain_t *domain_in,
+                     uint16_t alias, uint16_t position);
 
-// Create PDO mapping for a profile and apply to slave config.
-// - Does NOT activate master.
-// - For 'basic', this mirrors the slave's fixed mapping (no remap attempt).
-// - For 'fan16'/'bits32', this configures PDOs (requires slave support).
-int pdo_map_create_and_apply(ec_slave_config_t *sc,
-                             pdo_profile_t profile,
-                             pdo_map_t *out_map);
+// Free heap allocations inside the map (safe at shutdown).
+void pdo_map_free(pdo_map_t *m);
 
-// Register PDO entries with the two domains and resolve offsets.
-// You must pass the addressing you used for ecrt_master_slave_config.
-int pdo_map_register_domains(pdo_map_t *map,
-                             ec_domain_t *domain_out, ec_domain_t *domain_in,
-                             uint16_t alias, uint16_t position,
-                             uint32_t vendor_id, uint32_t product_code);
-
-// Resolve a named signal (offset + optional bit-position + bit-length).
-// Returns 0 on success; non-zero if the signal isn't present in this profile.
-int pdo_map_get_signal(const pdo_map_t *map, pdo_signal_id_t id,
-                       map_dir_t *dir, unsigned int **offset_ptr,
-                       unsigned int **bitpos_ptr, uint8_t *bits);
-
-// Free all heap allocations inside the map (safe to call once after shutdown).
-void pdo_map_free(pdo_map_t *map);
+// Access helpers (subindex is 1‑based, same as your device)
+#define SUB_TO_IDX(si) ((unsigned)((si)-1))
+#define OFF_OUT_2000(m, si) ((m)->off_out_2000[SUB_TO_IDX(si)])
+#define OFF_IN_3000(m, si)  ((m)->off_in_3000 [SUB_TO_IDX(si)])
