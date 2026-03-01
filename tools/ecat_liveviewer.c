@@ -16,7 +16,7 @@
 #include <unistd.h>
 #include <jansson.h>
 
-#include "pdo_map.h"
+#include "liveviewer_pdo_map.h"
 
 /* ----------------------------- JSON SM3 fields ---------------------------- */
 

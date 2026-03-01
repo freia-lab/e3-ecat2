@@ -22,5 +22,7 @@ dbl
 tools/*.o
 tools/ecat_minimal
 tools/ecat_dual_domain_pdo
+tools/ecat_dual
+tools/ecat_liveviewer
 tools/ecat_minimal_pdo
 

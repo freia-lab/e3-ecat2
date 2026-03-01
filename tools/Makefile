@@ -23,7 +23,7 @@ else
   LDLIBS  := -lethercat $(JANSSON_LIBS)
 endif
 
-BIN := ecat_cfgdiag ecat_liveviewer ecat_dump_raw ecat_minimal ecat_dual_domain_pdo
+BIN := ecat_cfgdiag ecat_liveviewer ecat_dump_raw ecat_minimal ecat_dual_domain_pdo ecat_dual
 
 all: $(BIN)
 
@@ -48,6 +48,10 @@ ecat_minimal_pdo: ecat_minimal_pdo.o
         $(LDFLAGS) $(LDLIBS)
 
 ecat_dual_domain_pdo: ecat_dual_domain_pdo.o
+	$(CC) $^ -o $@ -lncurses \
+        $(LDFLAGS) $(LDLIBS)
+
+ecat_dual: ecat_dual.o pdo_map.o
 	$(CC) $^ -o $@ -lncurses \
         $(LDFLAGS) $(LDLIBS)
 
