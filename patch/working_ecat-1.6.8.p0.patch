@@ -20,10 +20,10 @@ index bf8a7da..c19d1bd 100644
    	if( rectype == REC_ERROR )
      {
 diff --git drvethercat.c drvethercat.c
-index 12c2054..cafdaec 100644
+index 12c2054..517d431 100644
 --- drvethercat.c
 +++ drvethercat.c
-@@ -28,6 +28,8 @@
+@@ -28,13 +28,15 @@
  
  
  #include "ec.h"
@@ -32,7 +32,923 @@ index 12c2054..cafdaec 100644
  
  /*------------------------------------------------------------------- */
  
-@@ -774,18 +776,14 @@ epicsExportRegistrar( drvethercat2_registrar );
+ 
+-#define ECAT_TNAME_D	"ecat_dom"
+-#define ECAT_TNAME_IRQ	"ecat_irq"
+-#define ECAT_TNAME_SC	"ecat_sc"
++#define ECAT_TNAME_D    "ecat_dom"
++#define ECAT_TNAME_IRQ    "ecat_irq"
++#define ECAT_TNAME_SC    "ecat_sc"
+ 
+ int drvethercatDebug = 0;
+ static ethcat *ecatList = NULL;
+@@ -53,10 +55,10 @@ static void dmmdebug( const char *format, ... )
+ 
+ static inline void *_zalloc( int size )
+ {
+-	void *p = calloc( 1, size );
+-	if( !p )
+-		errlogSevPrintf( errlogFatal, "%s: Memory allocation failed.\n", __func__ );
+-	return p;
++    void *p = calloc( 1, size );
++    if( !p )
++        errlogSevPrintf( errlogFatal, "%s: Memory allocation failed.\n", __func__ );
++    return p;
+ }
+ #define zalloc(size) ({ void *__p = _zalloc(size); if(!__p) exit(S_dev_noMemory); __p; })
+ 
+@@ -70,38 +72,38 @@ static inline void *_zalloc( int size )
+ 
+ void process_hooks( initHookState state )
+ {
+-	ethcat **ec;
+-	static int workthreadsrunning = 0;
+-	FN_CALLED;
+-
+-	switch( state )
+-	{
+-		case initHookAfterDatabaseRunning:
+-
+-				if( workthreadsrunning )
+-					return;
+-				workthreadsrunning = 1;
+-
+-				/* unfortunately, this below does not help, */
+-				/* it only delays the inevitable callback buffer overrun */
+-				/*callbackSetQueueSize( 1000000 ); */
+-
+-				/* start various threads */
+-				for( ec = &ecatList; *ec; ec = &(*ec)->next )
+-				{
+-					(*ec)->dthread = epicsThreadMustCreate( ECAT_TNAME_D, 80, /* epicsThreadPriorityLow, */
+-										epicsThreadGetStackSize(epicsThreadStackSmall), &ec_worker_thread, *ec );
+-					(*ec)->irqthread = epicsThreadMustCreate( ECAT_TNAME_IRQ, epicsThreadPriorityLow,
+-										epicsThreadGetStackSize(epicsThreadStackSmall), &ec_irq_thread, *ec );
+-					(*ec)->scthread = epicsThreadMustCreate( ECAT_TNAME_SC, epicsThreadPriorityLow,
+-										epicsThreadGetStackSize(epicsThreadStackSmall), &ec_shc_thread, *ec );
+-					printf( PPREFIX "worker, irq and slave-check threads started\n" );
+-				}
+-				break;
+-
+-		default:
+-				break;
+-	}
++    ethcat **ec;
++    static int workthreadsrunning = 0;
++    FN_CALLED;
++
++    switch( state )
++    {
++        case initHookAfterDatabaseRunning:
++
++                if( workthreadsrunning )
++                    return;
++                workthreadsrunning = 1;
++
++                /* unfortunately, this below does not help, */
++                /* it only delays the inevitable callback buffer overrun */
++                /*callbackSetQueueSize( 1000000 ); */
++
++                /* start various threads */
++                for( ec = &ecatList; *ec; ec = &(*ec)->next )
++                {
++                    (*ec)->dthread = epicsThreadMustCreate( ECAT_TNAME_D, 80, /* epicsThreadPriorityLow, */
++                                        epicsThreadGetStackSize(epicsThreadStackSmall), &ec_worker_thread, *ec );
++                    (*ec)->irqthread = epicsThreadMustCreate( ECAT_TNAME_IRQ, epicsThreadPriorityLow,
++                                        epicsThreadGetStackSize(epicsThreadStackSmall), &ec_irq_thread, *ec );
++                    (*ec)->scthread = epicsThreadMustCreate( ECAT_TNAME_SC, epicsThreadPriorityLow,
++                                        epicsThreadGetStackSize(epicsThreadStackSmall), &ec_shc_thread, *ec );
++                    printf( PPREFIX "worker, irq and slave-check threads started\n" );
++                }
++                break;
++
++        default:
++                break;
++    }
+ 
+ 
+ }
+@@ -112,243 +114,269 @@ void process_hooks( initHookState state )
+ /*-------------------------------------------------------------------- */
+ ethcat *ethercatOpen( int domain_nr )
+ {
+-	ethcat *e;
+-	FN_CALLED;
+-
+-	for( e = ecatList; e; e = e->next )
+-	{
+-		if( e->dnr == domain_nr )
+-			return e;
+-	}
+-	return NULL;
++    ethcat *e;
++    FN_CALLED;
++
++    for( e = ecatList; e; e = e->next )
++    {
++        if( e->dnr == domain_nr )
++            return e;
++    }
++    return NULL;
+ }
+ 
+ 
+ void drvethercatAtExit( void *arg )
+ {
+-	ethcat *e = (ethcat *)arg;
++    ethcat *e = (ethcat *)arg;
+ 
+-	FN_CALLED;
++    FN_CALLED;
+ 
+-	pinfo( "%s: Deactivating master, domain %d\n", __func__, e->dnr );
+-	ecrt_master_deactivate( ecroot->child->mdata.master );
++    pinfo( "%s: Deactivating master, domain %d\n", __func__, e->dnr );
++    ecrt_master_deactivate( ecroot->child->mdata.master );
+ 
+-	pinfo( "%s: Releasing master\n", __func__ );
+-	ecrt_release_master( ecroot->child->mdata.master );
++    pinfo( "%s: Releasing master\n", __func__ );
++    ecrt_release_master( ecroot->child->mdata.master );
+ 
+ }
+ 
+ ethcat *drvFindDomain( int dnr )
+ {
+-	ethcat **ec;
+-	for( ec = &ecatList; *ec; ec = &(*ec)->next )
+-		if( (*ec)->dnr == dnr )
+-			return *ec;
++    ethcat **ec;
++    for( ec = &ecatList; *ec; ec = &(*ec)->next )
++        if( (*ec)->dnr == dnr )
++            return *ec;
+ 
+-	return NULL;
++    return NULL;
+ }
+ 
+ int drvGetRegisterDesc( ethcat *e, domain_register *dreg, int regnr, ecnode **pentry, int *token_num )
+ {
+-	ecnode *d;
+-
+-	if( !e )
+-	{
+-		errlogSevPrintf( errlogFatal, "%s: ethcat/e NULL - init failed\n", __func__ );
+-		return FAIL;
+-	}
+-
+-	if( !e->d )
+-	{
+-		errlogSevPrintf( errlogFatal, "%s: ethcat domain NULL - domain init failed\n", __func__ );
+-		return FAIL;
+-	}
+-
+-	d = e->d;
+-
+-	FN_CALLED;
+-	if( regnr < 0 || regnr > d->ddata.num_of_regs )
+-	{
+-		errlogSevPrintf( errlogFatal, "%s: Domain register %d is out of range for this domain\n", __func__, regnr );
+-		return FAIL;
+-	}
+-
+-
+-	dreg->offs = d->ddata.reginfos[regnr].byte;
+-	dreg->bit = d->ddata.reginfos[regnr].bit;
+-	dreg->bitlen = (token_num[T_NUM] < 0 ? d->ddata.reginfos[regnr].bit_length : 8*parse_datatype_get_len( token_num[T_NUM] ) );
+-	dreg->bitspec = token_num[B_NUM];
+-	dreg->byteoffs = token_num[O_NUM];
+-	dreg->bytelen = token_num[L_NUM];
+-	dreg->typespec = token_num[T_NUM];
+-
+-	*pentry = d->ddata.reginfos[regnr].pdo_entry;
+-	if( !*pentry )
+-	{
+-		errlogSevPrintf( errlogFatal, "%s: Domain register %d appears to have no pdo entry associated\n", __func__, regnr );
+-		return FAIL;
+-	}
+-
+-	return OK;
++    ecnode *d;
++
++    if( !e )
++    {
++        errlogSevPrintf( errlogFatal, "%s: ethcat/e NULL - init failed\n", __func__ );
++        return FAIL;
++    }
++
++    if( !e->d )
++    {
++        errlogSevPrintf( errlogFatal, "%s: ethcat domain NULL - domain init failed\n", __func__ );
++        return FAIL;
++    }
++
++    d = e->d;
++
++    FN_CALLED;
++    if( regnr < 0 || regnr > d->ddata.num_of_regs )
++    {
++        errlogSevPrintf( errlogFatal, "%s: Domain register %d is out of range for this domain\n", __func__, regnr );
++        return FAIL;
++    }
++
++
++    dreg->offs = d->ddata.reginfos[regnr].byte;
++    dreg->bit = d->ddata.reginfos[regnr].bit;
++    dreg->bitlen = (token_num[T_NUM] < 0 ? d->ddata.reginfos[regnr].bit_length : 8*parse_datatype_get_len( token_num[T_NUM] ) );
++    dreg->bitspec = token_num[B_NUM];
++    dreg->byteoffs = token_num[O_NUM];
++    dreg->bytelen = token_num[L_NUM];
++    dreg->typespec = token_num[T_NUM];
++
++    *pentry = d->ddata.reginfos[regnr].pdo_entry;
++    if( !*pentry )
++    {
++        errlogSevPrintf( errlogFatal, "%s: Domain register %d appears to have no pdo entry associated\n", __func__, regnr );
++        return FAIL;
++    }
++
++    return OK;
+ }
+ 
+ 
+ int drvGetLocalRegisterDesc( ethcat *e, domain_register *dreg, int *dreg_nr, ecnode **pentry, int *token_num )
+ {
+-	ecnode *d, *s;
+-	int i, found = 0, lr = token_num[LR_NUM], sm = token_num[SM_NUM], pdo = token_num[P_NUM];
+-	FN_CALLED;
+-
+-	if( !e )
+-	{
+-		errlogSevPrintf( errlogFatal, "%s: ethcat/e NULL - init failed\n", __func__ );
+-		return FAIL;
+-	}
+-
+-	if( !e->m )
+-	{
+-		errlogSevPrintf( errlogFatal, "%s: ethcat master NULL - domain init failed\n", __func__ );
+-		return FAIL;
+-	}
+-
+-	if( !e->d )
+-	{
+-		errlogSevPrintf( errlogFatal, "%s: ethcat domain NULL - domain init failed\n", __func__ );
+-		return FAIL;
+-	}
+-
+-	d = e->d;
+-
+-	s = ecn_get_child_nr_type( e->m, token_num[S_NUM], ECNT_SLAVE );
+-	if( !s )
+-	{
+-		errlogSevPrintf( errlogFatal, "%s: cannot find slave %d\n", __func__, token_num[S_NUM] );
+-		return FAIL;
+-	}
+-
+-	for( i = 0; !found && i < d->ddata.num_of_regs; i++ )
+-		if( d->ddata.reginfos[i].slave == s &&
+-				(sm < 0 || d->ddata.reginfos[i].sync->nr == sm ) &&
+-				(pdo < 0 || d->ddata.reginfos[i].pdo->nr == pdo )
+-			)
+-		{
+-				if( --lr < 0 )
+-				{
+-					found = 1;
+-					break;
+-				}
+-		}
+-
+-	if( !found )
+-	{
+-		errlogSevPrintf( errlogFatal, "%s: cannot find local register %d in domain %d (base: slave %d, sync %d, pdo %d)\n", __func__,
+-														token_num[LR_NUM], d->nr, s->nr, sm, pdo );
+-		return FAIL;
+-	}
+-
+-	*dreg_nr = i;
+-	dreg->offs = d->ddata.reginfos[i].byte;
+-	dreg->bit = d->ddata.reginfos[i].bit;
+-	dreg->bitlen = (token_num[T_NUM] < 0 ? d->ddata.reginfos[i].bit_length : 8*parse_datatype_get_len( token_num[T_NUM] ) );
+-	dreg->bitspec = token_num[B_NUM];
+-	dreg->byteoffs = token_num[O_NUM];
+-	dreg->bytelen = token_num[L_NUM];
+-	dreg->typespec = token_num[T_NUM];
+-
+-	*pentry = d->ddata.reginfos[i].pdo_entry;
+-	if( !*pentry )
+-	{
+-		errlogSevPrintf( errlogFatal, "%s: Domain register %d appears to have no pdo entry associated\n", __func__, i );
+-		return FAIL;
+-	}
+-
+-	return OK;
++    ecnode *d, *s;
++    int i, found = 0, lr = token_num[LR_NUM], sm = token_num[SM_NUM], pdo = token_num[P_NUM];
++    FN_CALLED;
++
++    if( !e )
++    {
++        errlogSevPrintf( errlogFatal, "%s: ethcat/e NULL - init failed\n", __func__ );
++        return FAIL;
++    }
++
++    if( !e->m )
++    {
++        errlogSevPrintf( errlogFatal, "%s: ethcat master NULL - domain init failed\n", __func__ );
++        return FAIL;
++    }
++
++    if( !e->d )
++    {
++        errlogSevPrintf( errlogFatal, "%s: ethcat domain NULL - domain init failed\n", __func__ );
++        return FAIL;
++    }
++
++    d = e->d;
++
++    s = ecn_get_child_nr_type( e->m, token_num[S_NUM], ECNT_SLAVE );
++    if( !s )
++    {
++        errlogSevPrintf( errlogFatal, "%s: cannot find slave %d\n", __func__, token_num[S_NUM] );
++        return FAIL;
++    }
++
++    for( i = 0; !found && i < d->ddata.num_of_regs; i++ )
++        if( d->ddata.reginfos[i].slave == s &&
++                (sm < 0 || d->ddata.reginfos[i].sync->nr == sm ) &&
++                (pdo < 0 || d->ddata.reginfos[i].pdo->nr == pdo )
++            )
++        {
++                if( --lr < 0 )
++                {
++                    found = 1;
++                    break;
++                }
++        }
++
++    if( !found )
++    {
++        errlogSevPrintf( errlogFatal, "%s: cannot find local register %d in domain %d (base: slave %d, sync %d, pdo %d)\n", __func__,
++                                                        token_num[LR_NUM], d->nr, s->nr, sm, pdo );
++        return FAIL;
++    }
++
++    *dreg_nr = i;
++    dreg->offs = d->ddata.reginfos[i].byte;
++    dreg->bit = d->ddata.reginfos[i].bit;
++    dreg->bitlen = (token_num[T_NUM] < 0 ? d->ddata.reginfos[i].bit_length : 8*parse_datatype_get_len( token_num[T_NUM] ) );
++    dreg->bitspec = token_num[B_NUM];
++    dreg->byteoffs = token_num[O_NUM];
++    dreg->bytelen = token_num[L_NUM];
++    dreg->typespec = token_num[T_NUM];
++
++    *pentry = d->ddata.reginfos[i].pdo_entry;
++    if( !*pentry )
++    {
++        errlogSevPrintf( errlogFatal, "%s: Domain register %d appears to have no pdo entry associated\n", __func__, i );
++        return FAIL;
++    }
++
++    return OK;
+ }
+ 
+ 
+ 
+ int drvGetEntryDesc( ethcat *e, domain_register *dreg, int *dreg_nr, ecnode **pentry, int *token_num )
+ {
+-	ecnode *d, *pe;
+-	int i;
+-	FN_CALLED;
+-
+-	if( !e )
+-	{
+-		errlogSevPrintf( errlogFatal, "%s: ethcat/e NULL - init failed\n", __func__ );
+-		return FAIL;
+-	}
+-
+-	if( !e->d )
+-	{
+-		errlogSevPrintf( errlogFatal, "%s: ethcat domain NULL - domain init failed\n", __func__ );
+-		return FAIL;
+-	}
+-
+-	d = e->d;
+-
+-
+-	pe = ecn_get_pdo_entry_nr( 0, token_num[S_NUM], token_num[SM_NUM], token_num[P_NUM], token_num[E_NUM] );
+-	if( !pe )
+-	{
+-		errlogSevPrintf( errlogFatal, "%s: PDO entry s%d.sm%d.p%d.e%d not found\n", __func__,
+-				token_num[S_NUM], token_num[SM_NUM], token_num[P_NUM], token_num[E_NUM] );
+-		return FAIL;
+-	}
+-
+-	if( !pe->domain_entry )
+-	{
+-		errlogSevPrintf( errlogFatal, "%s: PDO entry s%d.sm%d.p%d.e%d not registered in any domain\n",
+-													__func__, token_num[S_NUM], token_num[SM_NUM], token_num[P_NUM], token_num[E_NUM] );
+-		return FAIL;
+-	}
+-
+-	if( pe->domain_entry->de_domain->nr != d->nr )
+-	{
+-		errlogSevPrintf( errlogFatal, "%s: PDO entry s%d.sm%d.p%d.e%d registered in other domain (%d)\n",
+-						__func__, token_num[S_NUM], token_num[SM_NUM], token_num[P_NUM], token_num[E_NUM], pe->domain_entry->de_domain->nr );
+-		return FAIL;
+-	}
+-
+-	*pentry = pe;
+-	for( i = 0; i < d->ddata.num_of_regs; i++ )
+-		if( d->ddata.reginfos[i].pdo_entry == pe )
+-		{
+-			*dreg_nr = i;
+-			dreg->offs = d->ddata.reginfos[i].byte;
+-			dreg->bit = d->ddata.reginfos[i].bit;
+-			dreg->bitlen = (token_num[T_NUM] < 0 ? d->ddata.reginfos[i].bit_length : 8*parse_datatype_get_len( token_num[T_NUM] ) );
+-			dreg->bitspec = token_num[B_NUM];
+-			dreg->byteoffs = token_num[O_NUM];
+-			dreg->bytelen = token_num[L_NUM];
+-			dreg->typespec = token_num[T_NUM];
+-
+-			return OK;
+-		}
+-
+-
+-	errlogSevPrintf( errlogFatal, "%s: Internal error - PDO entry s%d.sm%d.p%d.e%d registered in domain %d, but not in reg list\n",
+-												__func__, token_num[S_NUM], token_num[SM_NUM], token_num[P_NUM], token_num[E_NUM], pe->domain_entry->de_domain->nr );
+-
+-	return FAIL;
++    ecnode *d, *pe;
++    int i;
++    FN_CALLED;
++
++    if( !e )
++    {
++        errlogSevPrintf( errlogFatal, "%s: ethcat/e NULL - init failed\n", __func__ );
++        return FAIL;
++    }
++
++    if( !e->d )
++    {
++        errlogSevPrintf( errlogFatal, "%s: ethcat domain NULL - domain init failed\n", __func__ );
++        return FAIL;
++    }
++
++    d = e->d;
++
++
++    pe = ecn_get_pdo_entry_nr( 0, token_num[S_NUM], token_num[SM_NUM], token_num[P_NUM], token_num[E_NUM] );
++    if( !pe )
++    {
++        errlogSevPrintf( errlogFatal, "%s: PDO entry s%d.sm%d.p%d.e%d not found\n", __func__,
++                token_num[S_NUM], token_num[SM_NUM], token_num[P_NUM], token_num[E_NUM] );
++        return FAIL;
++    }
++
++    if( !pe->domain_entry )
++    {
++        errlogSevPrintf( errlogFatal, "%s: PDO entry s%d.sm%d.p%d.e%d not registered in any domain\n",
++                                                    __func__, token_num[S_NUM], token_num[SM_NUM], token_num[P_NUM], token_num[E_NUM] );
++        return FAIL;
++    }
++
++    if( pe->domain_entry->de_domain->nr != d->nr )
++    {
++        errlogSevPrintf( errlogFatal, "%s: PDO entry s%d.sm%d.p%d.e%d registered in other domain (%d)\n",
++                        __func__, token_num[S_NUM], token_num[SM_NUM], token_num[P_NUM], token_num[E_NUM], pe->domain_entry->de_domain->nr );
++        return FAIL;
++    }
++
++    *pentry = pe;
++    for( i = 0; i < d->ddata.num_of_regs; i++ )
++        if( d->ddata.reginfos[i].pdo_entry == pe )
++        {
++            *dreg_nr = i;
++            dreg->offs = d->ddata.reginfos[i].byte;
++            dreg->bit = d->ddata.reginfos[i].bit;
++            dreg->bitlen = (token_num[T_NUM] < 0 ? d->ddata.reginfos[i].bit_length : 8*parse_datatype_get_len( token_num[T_NUM] ) );
++            dreg->bitspec = token_num[B_NUM];
++            dreg->byteoffs = token_num[O_NUM];
++            dreg->bytelen = token_num[L_NUM];
++            dreg->typespec = token_num[T_NUM];
++
++            return OK;
++        }
++
++
++    errlogSevPrintf( errlogFatal, "%s: Internal error - PDO entry s%d.sm%d.p%d.e%d registered in domain %d, but not in reg list\n",
++                                                __func__, token_num[S_NUM], token_num[SM_NUM], token_num[P_NUM], token_num[E_NUM], pe->domain_entry->de_domain->nr );
++
++    return FAIL;
+ }
+ 
+ 
+ int drvDomainExists( int mnr, int dnr )
+ {
+-	ecnode *m, *d;
++    ecnode *m, *d;
+ 
+-	FN_CALLED;
++    FN_CALLED;
+ 
+-	m = ecn_get_child_nr_type( ecroot, mnr, ECNT_MASTER );
+-	if( !m )
+-		return FAIL;
++    m = ecn_get_child_nr_type( ecroot, mnr, ECNT_MASTER );
++    if( !m )
++        return FAIL;
+ 
+-	d = ecn_get_child_nr_type( m, dnr, ECNT_DOMAIN );
+-	if( !d )
+-		return FAIL;
++    d = ecn_get_child_nr_type( m, dnr, ECNT_DOMAIN );
++    if( !d )
++        return FAIL;
+ 
+-	return OK;
++    return OK;
++}
++
++static int ecat2_activate_master_and_bind_domains(ecnode *m)
++{
++    if (!m || !m->mdata.master) return -1;
++
++    /* Activate the master now that ALL domains are registered. */
++    if (ecrt_master_activate(m->mdata.master)) {
++        errlogSevPrintf(errlogFatal, "%s: ecrt_master_activate failed\n", __func__);
++        return -1;
++    }
++
++    /* Bind domain process data pointers AFTER activation for EVERY domain. */
++    for (ethcat *ec = ecatList; ec; ec = ec->next) {
++#ifndef DOMAIN_EXT_MEM
++        if (!ec->d->ddata.dmem) {
++            ec->d->ddata.dmem = (char *)ecrt_domain_data(ec->d->domain_t);
++            if (!ec->d->ddata.dmem) {
++                errlogSevPrintf(errlogFatal, "%s: ecrt_domain_data returned NULL for domain %d\n",
++                                 __func__, ec->dnr);
++                return -1;
++            }
++        }
++#endif
++    }
++    return 0;
+ }
+ 
+ /*-------------------------------------------------------------------*/
+@@ -369,14 +397,14 @@ long drvethercatConfigure(
+     ecnode *m;
+     EC_ERR retv;
+ 
+-	FN_CALLED;
++    FN_CALLED;
+ 
+     /* check arguments */
+     if( domain_nr < 0 ||
+-    	freq < 0.001 || freq > 15000.0 ||
+-    	autoconfig < 0 || autoconfig > 1 ||
+-    	autostart < 0 || autostart > 1
+-   	)
++        freq < 0.001 || freq > 15000.0 ||
++        autoconfig < 0 || autoconfig > 1 ||
++        autostart < 0 || autostart > 1
++       )
+     {
+         printf( "----------------------------------------------------------------------------------\n" );
+         printf( "Usage: drvethercatConfigure( domain_nr )\n\n");
+@@ -390,7 +418,7 @@ long drvethercatConfigure(
+         printf( "----------------------------------------------------------------------------------\n" );
+ 
+         printf( "\n***** ecat2 driver called with drvethercatConfigure %d, %f, %d, %d\n",
+-        		domain_nr, freq, autoconfig, autostart );
++                domain_nr, freq, autoconfig, autostart );
+         printf( "\n***** ecat2 EPICS driver not loaded!\n\n");
+         return 0;
+     }
+@@ -398,38 +426,38 @@ long drvethercatConfigure(
+ 
+     if( !ecroot )
+     {
+-		/*--------------------------------- */
+-		/* create root and master           */
+-		ecroot = ecn_add_child_type( NULL, ECNT_ROOT );
+-		if( !ecroot )
+-		{
+-			errlogSevPrintf( errlogFatal, "%s: creating root node failed\n", __func__ );
+-			return ERR_OUT_OF_MEMORY;
+-		}
+-
+-		ecroot->nr = 0;
++        /*--------------------------------- */
++        /* create root and master           */
++        ecroot = ecn_add_child_type( NULL, ECNT_ROOT );
++        if( !ecroot )
++        {
++            errlogSevPrintf( errlogFatal, "%s: creating root node failed\n", __func__ );
++            return ERR_OUT_OF_MEMORY;
++        }
++
++        ecroot->nr = 0;
+     }
+ 
+     if( !ecroot->child )
+     {
+-		/* currently fixed to a single master */
+-		m = ecn_add_child_type( ecroot, ECNT_MASTER );
+-		if( !m )
+-		{
+-			errlogSevPrintf( errlogFatal, "%s: creating master node failed\n", __func__ );
+-			return ERR_OUT_OF_MEMORY;
+-		}
+-
+-		m->nr = 0;
+-
+-		/* allocate a master */
+-	    pinfo( PPREFIX "Requesting master..." );
+-	    if( !(m->mdata.master = ecrt_request_master( 0 )) )
+-	        perrret( "\nRequesting master 0 failed. EtherCAT Master not running or not responding.\n" );
+-	    pinfo( "succeeded\n" );
++        /* currently fixed to a single master */
++        m = ecn_add_child_type( ecroot, ECNT_MASTER );
++        if( !m )
++        {
++            errlogSevPrintf( errlogFatal, "%s: creating master node failed\n", __func__ );
++            return ERR_OUT_OF_MEMORY;
++        }
++
++        m->nr = 0;
++
++        /* allocate a master */
++        pinfo( PPREFIX "Requesting master..." );
++        if( !(m->mdata.master = ecrt_request_master( 0 )) )
++            perrret( "\nRequesting master 0 failed. EtherCAT Master not running or not responding.\n" );
++        pinfo( "succeeded\n" );
+     }
+     else
+-    	m = ecroot->child;
++        m = ecroot->child;
+ 
+     /*-------------------------- */
+     /*                           */
+@@ -441,94 +469,95 @@ long drvethercatConfigure(
+     printf( PPREFIX "Configuring EL6692 entries end.\n" );
+ 
+ 
+-    /* query master about the current config */
+-    if( !master_create_physical_config( m ) )
+-    {
+-		errlogSevPrintf( errlogFatal, "%s: creating master config failed\n", __func__ );
+-		return ERR_BAD_REQUEST;
++    /* Build the physical tree only once. Reusing it avoids duplicate slaves. */
++    if (!m->child) {
++      /* query master about the current config */
++      if (!master_create_physical_config(m)) {
++        errlogSevPrintf(errlogFatal, "%s: creating master config failed\n", __func__);
++        return ERR_BAD_REQUEST;
++      }
+     }
+ 
+-    printf( PPREFIX "Configuring slave(s) start...\n" );
+-    retv = execute_configuration_prg();
+-	if( retv != ERR_NO_ERROR )
+-	{
+-		errlogSevPrintf( errlogFatal, "%s: executing slave configuration program failed (error %d)\n", __func__, retv );
+-		return retv;
+-	}
+-    printf( PPREFIX "Configuring slave(s) end.\n" );
++    /* CIFX: PDO map is fixed – skip cfgslave/cfg program */
++    printf( PPREFIX "Skipping cfgslave program for CIFX fixed PDO map.\n" );
+ 
+ 
+-	/*--------------------------------- */
++    /*--------------------------------- */
+     /* create and init domain           */
+ 
+     /* is this domain already registered? */
+     for( ec = &ecatList; *ec; ec = &(*ec)->next )
+-    	if( (*ec)->dnr == domain_nr )
+-    	{
+-    		errlogSevPrintf( errlogFatal, "%s: EtherCAT domain %d has already been registered\n", __func__, domain_nr );
+-    		return ERR_ALREADY_EXISTS;
+-    	}
++        if( (*ec)->dnr == domain_nr )
++        {
++            errlogSevPrintf( errlogFatal, "%s: EtherCAT domain %d has already been registered\n", __func__, domain_nr );
++            return ERR_ALREADY_EXISTS;
++        }
+ 
+ 
+     *ec = malloc( sizeof(ethcat) );
+-	if( *ec == NULL )
+-	{
+-		errlogSevPrintf( errlogFatal, "%s: Memory allocation failed.\n", __func__ );
+-		return ERR_OUT_OF_MEMORY;
+-	}
++    if( *ec == NULL )
++    {
++        errlogSevPrintf( errlogFatal, "%s: Memory allocation failed.\n", __func__ );
++        return ERR_OUT_OF_MEMORY;
++    }
+ 
+     (*ec)->next = NULL;
+     (*ec)->dnr = domain_nr;
+-	(*ec)->rw_lock = epicsMutexMustCreate();
+-	(*ec)->health_lock = epicsMutexMustCreate();
+-	(*ec)->irq_lock = epicsMutexMustCreate();
+-	(*ec)->rate = (long)((double)1000000000.0/(double)freq);
+-	(*ec)->m = m;
+-	(*ec)->irq = epicsEventMustCreate( epicsEventEmpty );
+-
+-
+-	/*---------------------------------- */
+-	if( !((*ec)->d = add_domain( m, (*ec)->rate )) )
+-	{
+-		errlogSevPrintf( errlogFatal, "%s: Domain init and autoconfig failed.\n", __func__ );
+-		return ERR_OUT_OF_MEMORY;
+-	}
+-	(*ec)->d->nr = domain_nr;
+-	(*ec)->d->ddata.sts_lock = epicsMutexMustCreate();
+-	(*ec)->r_data = (*ec)->d->ddata.rmem;
+-	(*ec)->w_data = (*ec)->d->ddata.wmem;
++    (*ec)->rw_lock = epicsMutexMustCreate();
++    (*ec)->health_lock = epicsMutexMustCreate();
++    (*ec)->irq_lock = epicsMutexMustCreate();
++    (*ec)->rate = (long)((double)1000000000.0/(double)freq);
++    (*ec)->m = m;
++    (*ec)->irq = epicsEventMustCreate( epicsEventEmpty );
++
++
++    /*---------------------------------- */
++    if( !((*ec)->d = add_domain( m, (*ec)->rate )) )
++    {
++        errlogSevPrintf( errlogFatal, "%s: Domain init and autoconfig failed.\n", __func__ );
++        return ERR_OUT_OF_MEMORY;
++    }
++    (*ec)->d->nr = domain_nr;
++    (*ec)->d->ddata.sts_lock = epicsMutexMustCreate();
++    (*ec)->r_data = (*ec)->d->ddata.rmem;
++    (*ec)->w_data = (*ec)->d->ddata.wmem;
+     (*ec)->w_mask = calloc( 1, (*ec)->d->ddata.dsize );
+-	if( !(*ec)->w_mask )
+-	{
+-		errlogSevPrintf( errlogFatal, "%s: allocating memory for domain wmask failed\n", __func__ );
+-		return ERR_OUT_OF_MEMORY;
+-	}
++    if( !(*ec)->w_mask )
++    {
++        errlogSevPrintf( errlogFatal, "%s: allocating memory for domain wmask failed\n", __func__ );
++        return ERR_OUT_OF_MEMORY;
++    }
+     (*ec)->irq_r_mask = calloc( 1, (*ec)->d->ddata.dsize );
+-	if( !(*ec)->irq_r_mask )
+-	{
+-		errlogSevPrintf( errlogFatal, "%s: allocating memory for domain irq rmask failed\n", __func__ );
+-		return ERR_OUT_OF_MEMORY;
+-	}
+-
+-	/*---------------------------------- */
+-	/* init irq scanning */
++    if( !(*ec)->irq_r_mask )
++    {
++        errlogSevPrintf( errlogFatal, "%s: allocating memory for domain irq rmask failed\n", __func__ );
++        return ERR_OUT_OF_MEMORY;
++    }
++
++    /*---------------------------------- */
++    /* init irq scanning */
+     scanIoInit( &((*ec)->r_scan) );
+     scanIoInit( &((*ec)->w_scan) );
+ 
+     /* register atexit callback */
+     /*epicsAtExit( drvethercatAtExit, *ec ); */
+ 
+-	/*---------------------------------- */
+-	printf( PPREFIX "\n" );
+-	printf( PPREFIX "Domain %d\n", domain_nr );
+-	printf( PPREFIX "Domain frequency %.1f Hz (1 network packet sent every %f ms)\n", freq, (double)((*ec)->rate)/(double)1000000 );
+-	printf( PPREFIX "Domain registers %d\n", (*ec)->d->ddata.num_of_regs );
+-	printf( PPREFIX "Domain size %d bytes (allocated %d bytes)\n", (*ec)->d->ddata.dsize, (*ec)->d->ddata.dallocated );
+-	printf( PPREFIX "Slave-to-slave entries %d\n", (*ec)->d->ddata.num_of_sts_entries );
+-
+-
++    /*---------------------------------- */
++    printf( PPREFIX "\n" );
++    printf( PPREFIX "Domain %d\n", domain_nr );
++    printf( PPREFIX "Domain frequency %.1f Hz (1 network packet sent every %f ms)\n", freq, (double)((*ec)->rate)/(double)1000000 );
++    printf( PPREFIX "Domain registers %d\n", (*ec)->d->ddata.num_of_regs );
++    printf( PPREFIX "Domain size %d bytes (allocated %d bytes)\n", (*ec)->d->ddata.dsize, (*ec)->d->ddata.dallocated );
++    printf( PPREFIX "Slave-to-slave entries %d\n", (*ec)->d->ddata.num_of_sts_entries );
++
++    /* If autostart==1, activate ONCE (after this domain is added). */
++    if (autostart) {
++      if (ecat2_activate_master_and_bind_domains(m) != 0) {
++        return ERR_BAD_REQUEST;
++      }
++    }
+ 
+-	printf( PPREFIX "Domain %d configure process completed\n", domain_nr );
++    printf( PPREFIX "Domain %d configure process completed\n", domain_nr );
+     return 0;
+ }
+ 
+@@ -553,10 +582,10 @@ long drvethercatConfigure(
+ /*                       */
+ /* Configure             */
+ /*                       */
+-static const iocshArg drvethercatConfigureArg0 = { "domainnr", 		iocshArgInt };
+-static const iocshArg drvethercatConfigureArg1 = { "freq", 			iocshArgDouble };
+-static const iocshArg drvethercatConfigureArg2 = { "autoconfig",	iocshArgInt };
+-static const iocshArg drvethercatConfigureArg3 = { "autostart", 	iocshArgInt };
++static const iocshArg drvethercatConfigureArg0 = { "domainnr",         iocshArgInt };
++static const iocshArg drvethercatConfigureArg1 = { "freq",             iocshArgDouble };
++static const iocshArg drvethercatConfigureArg2 = { "autoconfig",    iocshArgInt };
++static const iocshArg drvethercatConfigureArg3 = { "autostart",     iocshArgInt };
+ static const iocshArg * const drvethercatConfigureArgs[] = {
+     &drvethercatConfigureArg0,
+     &drvethercatConfigureArg1,
+@@ -582,7 +611,7 @@ static void drvethercatConfigureFunc( const iocshArgBuf *args )
+ /* dmap                  */
+ /*                       */
+ /*---------------------- */
+-static const iocshArg drvethercatDMapArg0 = { "cmd", 		iocshArgString };
++static const iocshArg drvethercatDMapArg0 = { "cmd",         iocshArgString };
+ static const iocshArg * const drvethercatDMapArgs[] = {
+     &drvethercatDMapArg0,
+ };
+@@ -604,7 +633,7 @@ static void drvethercatDMapFunc( const iocshArgBuf *args )
+ /* stat                  */
+ /*                       */
+ /*---------------------- */
+-static const iocshArg drvethercatstatArg0 = { "dnr", 		iocshArgInt };
++static const iocshArg drvethercatstatArg0 = { "dnr",         iocshArgInt };
+ static const iocshArg * const drvethercatstatArgs[] = {
+     &drvethercatstatArg0
+ };
+@@ -626,9 +655,9 @@ static void drvethercatStatFunc( const iocshArgBuf *args )
+ /*                       */
+ /*---------------------- */
+ static const iocshArg drvethercatConfigEL6692Arg[] = {
+-		{ "slave_pos",  	iocshArgInt },
+-		{ "io",  			iocshArgString },
+-		{ "bitlen", 		iocshArgInt }
++        { "slave_pos",      iocshArgInt },
++        { "io",              iocshArgString },
++        { "bitlen",         iocshArgInt }
+ };
+ static const iocshArg * const drvethercatConfigEL6692Args[] = {
+     &drvethercatConfigEL6692Arg[0],
+@@ -657,8 +686,8 @@ static void drvethercatConfigEL6692Func( const iocshArgBuf *args )
+ /*                       */
+ /*---------------------- */
+ static const iocshArg drvethercatStSArg[] = {
+-		{ "from",  	iocshArgString },
+-		{ "to",  	iocshArgString },
++        { "from",      iocshArgString },
++        { "to",      iocshArgString },
+ };
+ static const iocshArg *const drvethercatStSArgs[] = {
+     &drvethercatStSArg[0],
+@@ -684,7 +713,7 @@ static void drvethercatStSFunc( const iocshArgBuf *args )
+ /*                       */
+ /*---------------------- */
+ static const iocshArg _si_args[] = {
+-		{ "level",  	iocshArgInt },
++        { "level",      iocshArgInt },
+ };
+ static const iocshArg *const si_args[] = {
+     &_si_args[0],
+@@ -710,13 +739,13 @@ static void si_fn( const iocshArgBuf *args )
+ 
+ 
+ static const iocshArg drvethercatcfgslaveArg[] = {
+-		{ "cmd",  				iocshArgString },
+-		{ "s_nr",  				iocshArgInt },
+-		{ "sm_nr",  			iocshArgInt },
+-		{ "pdo_ix_dir",  		iocshArgInt },
+-		{ "entry_ix_wd_mode",	iocshArgInt },
+-		{ "entry_sub_ix",		iocshArgInt },
+-		{ "entry_bitlen",		iocshArgInt },
++        { "cmd",                  iocshArgString },
++        { "s_nr",                  iocshArgInt },
++        { "sm_nr",              iocshArgInt },
++        { "pdo_ix_dir",          iocshArgInt },
++        { "entry_ix_wd_mode",    iocshArgInt },
++        { "entry_sub_ix",        iocshArgInt },
++        { "entry_bitlen",        iocshArgInt },
+ 
+ };
+ static const iocshArg *const drvethercatcfgslaveArgs[] = {
+@@ -762,7 +791,7 @@ static void drvethercat2_registrar()
+     iocshRegister( &drvethercatConfigureDef, drvethercatConfigureFunc );
+     iocshRegister( &drvethercatDMapDef, drvethercatDMapFunc );
+     iocshRegister( &drvethercatstatDef, drvethercatStatFunc );
+-	iocshRegister( &drvethercatConfigEL6692Def, drvethercatConfigEL6692Func );
++    iocshRegister( &drvethercatConfigEL6692Def, drvethercatConfigEL6692Func );
+     iocshRegister( &drvethercatStSDef, drvethercatStSFunc );
+     iocshRegister( &drvethercatcfgslaveDef, drvethercatcfgslaveFunc );
+     iocshRegister( &si_fndef, si_fn ); /* going for somewhat shorter names from now on :P */
+@@ -774,18 +803,11 @@ epicsExportRegistrar( drvethercat2_registrar );
  
  
  
@@ -52,23 +968,644 @@ index 12c2054..cafdaec 100644
  
  
 -
+-
+-
+-
 +epicsExportAddress(drvet, drvecat2);
- 
- 
- 
 diff --git eccfg.c eccfg.c
-index 1c70c90..f2719c2 100644
+index 1c70c90..ccf7655 100644
 --- eccfg.c
 +++ eccfg.c
-@@ -32,7 +32,7 @@
+@@ -32,7 +32,20 @@
  
  ecnode *ecroot = NULL;
  /*------------------------------------------------------------------- */
 -#define PRINT_PHYS_CONFIG 0
 +#define PRINT_PHYS_CONFIG 1
++
++/* ================================================================
++ * CIFX RE/ECS fixed PDO mapping support
++ * Vendor/Product: 0x0000006c : 0x0000a72c
++ * OUT: SM2 → PDO 0x1600 (0x2000:01‑C8) + 0x1601 (0x2001:01‑32)
++ * IN : SM3 → PDO 0x1A00 (0x3000:01‑C8) + 0x1A01 (0x3001:01‑32)
++ * ================================================================ */
++#define CIFX_VENDOR_ID     0x0000006c
++#define CIFX_PRODUCT_CODE  0x0000a72c
++#define CIFX_OUT2000_COUNT 200
++#define CIFX_OUT2001_COUNT 50
++#define CIFX_IN3000_COUNT  200
++#define CIFX_IN3001_COUNT  50
  
  int master_create_physical_config( ecnode *m )
  {
+@@ -55,23 +68,23 @@ int master_create_physical_config( ecnode *m )
+     {
+ 
+ 
+-    	if( slave_has_static_config( i ) )
++        if( slave_has_static_config( i ) )
+         {
+-        	pinfo( PPREFIX "Slave %d: Static config found, skipping autoconfig\n", i );
+-        	continue;
++            pinfo( PPREFIX "Slave %d: Static config found, skipping autoconfig\n", i );
++            continue;
+         }
+ 
+         if( !(slave = ecn_add_child_type( m, ECNT_SLAVE )) )
+             perrret( "%s: adding slave %d failed\n", __func__, i );
+-    	slave->nr = i;
++        slave->nr = i;
+ 
+-    	if( ecrt_master_get_slave( ecm, i, &slave->slave_t ) )
++        if( ecrt_master_get_slave( ecm, i, &slave->slave_t ) )
+             perrret( "%s: cannot get slave %d info\n", __func__, i );
+-    	memcpy( &slave->sdata.config_slave_info, &slave->slave_t, sizeof(ec_slave_info_t) );
+-    	slave->sdata.check = 1;
++        memcpy( &slave->sdata.config_slave_info, &slave->slave_t, sizeof(ec_slave_info_t) );
++        slave->sdata.check = 1;
+ 
+ 
+-		sync_count = slave->slave_t.sync_count;
++        sync_count = slave->slave_t.sync_count;
+ 
+ #if PRINT_PHYS_CONFIG
+         pinfo( "   Slave %d: SMs %d, alias %d, vendor id 0x%08x, revision nr 0x%08x, product code 0x%08x, sernr 0x%08x\n",
+@@ -85,84 +98,177 @@ int master_create_physical_config( ecnode *m )
+              );
+ #endif
+ 
++        /* ========================================================
++         * CIFX RE/ECS fixed map override
++         * Build SM2/SM3 tree with PDOs + entries.
++         * ======================================================== */
++        if (slave->slave_t.vendor_id == CIFX_VENDOR_ID &&
++            slave->slave_t.product_code == CIFX_PRODUCT_CODE)
++        {
++            ecnode *sm2, *sm3, *pdoX, *peX;
++
++            /* Remove any auto-detected children (if present) */
++            if (slave->child)
++                ecn_delete_children(slave);
++
++            /* -------- SM2 (Output) -------- */
++            sm2 = ecn_add_child_type(slave, ECNT_SYNC);
++            if (!sm2) return 0;
++            sm2->nr = 2;
++            sm2->sync_t.index = 2;
++            sm2->sync_t.dir = EC_DIR_OUTPUT;
++            sm2->sync_t.n_pdos = 2;
++
++            /* PDO 0x1600 : 0x2000:01‑C8 (200 x 8‑bit) */
++            pdoX = ecn_add_child_type(sm2, ECNT_PDO);
++            if (!pdoX) return 0;
++            pdoX->nr = 0;
++            pdoX->pdo_t.index = 0x1600;
++            pdoX->pdo_t.n_entries = CIFX_OUT2000_COUNT;
++            for (l=0; l<CIFX_OUT2000_COUNT; l++) {
++                peX = ecn_add_child_type(pdoX, ECNT_PDO_ENTRY);
++                if (!peX) return 0;
++                peX->nr = l;
++                peX->pdo_entry_t.index = 0x2000;
++                peX->pdo_entry_t.subindex = l+1;
++                peX->pdo_entry_t.bit_length = 8;
++            }
+ 
++            /* PDO 0x1601 : 0x2001:01‑32 (50 x 8‑bit) */
++            pdoX = ecn_add_child_type(sm2, ECNT_PDO);
++            if (!pdoX) return 0;
++            pdoX->nr = 1;
++            pdoX->pdo_t.index = 0x1601;
++            pdoX->pdo_t.n_entries = CIFX_OUT2001_COUNT;
++            for (l=0; l<CIFX_OUT2001_COUNT; l++) {
++                peX = ecn_add_child_type(pdoX, ECNT_PDO_ENTRY);
++                if (!peX) return 0;
++                peX->nr = l;
++                peX->pdo_entry_t.index = 0x2001;
++                peX->pdo_entry_t.subindex = l+1;
++                peX->pdo_entry_t.bit_length = 8;
++            }
+ 
+-		if( slave_is_6692( i ) >= 0 )
+-    	{
+-    		/* special case - EL6692 */
+-			printf( PPREFIX "EL6692 at pos %d:\n", i );
+-
+-	        for( j = 0; j < sync_count; j++ )
+-	        {
+-	        	if( !(sm = ecn_add_child_type( slave, ECNT_SYNC )) )
+-	        		return 0;
+-	        	sm->nr = j;
+-	        	if( ecrt_master_get_sync_manager( ecm, i, j, &sm->sync_t ) )
+-	            	perrret( "%s: (EL6692) cannot get slave %d, sync mgr %d info\n", __func__, i, j );
+-
+-	        	pdo_count = get_no_pdos_6692( j );
++            /* -------- SM3 (Input) --------- */
++            sm3 = ecn_add_child_type(slave, ECNT_SYNC);
++            if (!sm3) return 0;
++            sm3->nr = 3;
++            sm3->sync_t.index = 3;
++            sm3->sync_t.dir = EC_DIR_INPUT;
++            sm3->sync_t.n_pdos = 2;
++
++            /* PDO 0x1A00 : 0x3000:01‑C8 (200 x 8‑bit) */
++            pdoX = ecn_add_child_type(sm3, ECNT_PDO);
++            if (!pdoX) return 0;
++            pdoX->nr = 0;
++            pdoX->pdo_t.index = 0x1A00;
++            pdoX->pdo_t.n_entries = CIFX_IN3000_COUNT;
++            for (l=0; l<CIFX_IN3000_COUNT; l++) {
++                peX = ecn_add_child_type(pdoX, ECNT_PDO_ENTRY);
++                if (!peX) return 0;
++                peX->nr = l;
++                peX->pdo_entry_t.index = 0x3000;
++                peX->pdo_entry_t.subindex = l+1;
++                peX->pdo_entry_t.bit_length = 8;
++            }
+ 
+-	        	for( k = 0; k < pdo_count; k++ )
+-	            {
+-	            	if( !(pdo = ecn_add_child_type( sm, ECNT_PDO )) )
+-	            			return 0;
+-	            	pdo->nr = k;
++            /* PDO 0x1A01 : 0x3001:01‑32 (50 x 8‑bit) */
++            pdoX = ecn_add_child_type(sm3, ECNT_PDO);
++            if (!pdoX) return 0;
++            pdoX->nr = 1;
++            pdoX->pdo_t.index = 0x1A01;
++            pdoX->pdo_t.n_entries = CIFX_IN3001_COUNT;
++            for (l=0; l<CIFX_IN3001_COUNT; l++) {
++                peX = ecn_add_child_type(pdoX, ECNT_PDO_ENTRY);
++                if (!peX) return 0;
++                peX->nr = l;
++                peX->pdo_entry_t.index = 0x3001;
++                peX->pdo_entry_t.subindex = l+1;
++                peX->pdo_entry_t.bit_length = 8;
++            }
+ 
+-	                if( !get_pdo_info_6692( ecm, i, j, k, &pdo->pdo_t ) )
+-	                {
+-	                	printf( "%s: (EL6692) cannot get slave %d, sync mgr %d, pdo %d info\n", __func__, i, j, k );
+-	                	continue;
+-	                }
++            /* Mapping fully injected for this slave; skip default scan */
++            continue;
++        }
+ 
+-	                entry_count = pdo->pdo_t.n_entries;
+ 
+-	#if PRINT_PHYS_CONFIG
+-	                pinfo( "         PDO %d: Entries %d, index 0x%04x\n",
+-	                        k,
+-	                        entry_count,
+-	                        pdo->pdo_t.index
+-	                     );
+-	#endif
+ 
+-	                for( l = 0; l < entry_count; l++ )
+-	                {
+-	                    if( !get_pdo_entry_info_6692( ecm, i, j, k, l, &pdo_entry )  )
+-	                    	perrret( "%s: (EL6692) cannot get slave %d, sync mgr %d, pdo %d, pdoe_entry %d info\n", __func__, i, j, k, l );
++        if( slave_is_6692( i ) >= 0 )
++        {
++            /* special case - EL6692 */
++            printf( PPREFIX "EL6692 at pos %d:\n", i );
+ 
+-	                    if( !pdo_entry.index )
+-							continue;
++            for( j = 0; j < sync_count; j++ )
++            {
++                if( !(sm = ecn_add_child_type( slave, ECNT_SYNC )) )
++                    return 0;
++                sm->nr = j;
++                if( ecrt_master_get_sync_manager( ecm, i, j, &sm->sync_t ) )
++                    perrret( "%s: (EL6692) cannot get slave %d, sync mgr %d info\n", __func__, i, j );
+ 
+-	                    if( !(pdoe = ecn_add_child_type( pdo, ECNT_PDO_ENTRY )) )
+-	                    	return 0;;
+-	                	pdoe->nr = l;
+-	                	memcpy( &pdoe->pdo_entry_t, &pdo_entry, sizeof(ec_pdo_entry_info_t) );
++                pdo_count = get_no_pdos_6692( j );
+ 
+-	#if PRINT_PHYS_CONFIG
+-	                    pinfo( "            Entry %d: index 0x%04x, subindex %d, bit length %d\n",
+-	                            l,
+-	                            pdo_entry.index,
+-	                            pdo_entry.subindex,
+-	                            pdo_entry.bit_length
+-	                         );
+-	#endif
+-	                }
++                for( k = 0; k < pdo_count; k++ )
++                {
++                    if( !(pdo = ecn_add_child_type( sm, ECNT_PDO )) )
++                            return 0;
++                    pdo->nr = k;
++
++                    if( !get_pdo_info_6692( ecm, i, j, k, &pdo->pdo_t ) )
++                    {
++                        printf( "%s: (EL6692) cannot get slave %d, sync mgr %d, pdo %d info\n", __func__, i, j, k );
++                        continue;
++                    }
++
++                    entry_count = pdo->pdo_t.n_entries;
++
++    #if PRINT_PHYS_CONFIG
++                    pinfo( "         PDO %d: Entries %d, index 0x%04x\n",
++                            k,
++                            entry_count,
++                            pdo->pdo_t.index
++                         );
++    #endif
++
++                    for( l = 0; l < entry_count; l++ )
++                    {
++                        if( !get_pdo_entry_info_6692( ecm, i, j, k, l, &pdo_entry )  )
++                            perrret( "%s: (EL6692) cannot get slave %d, sync mgr %d, pdo %d, pdoe_entry %d info\n", __func__, i, j, k, l );
++
++                        if( !pdo_entry.index )
++                            continue;
++
++                        if( !(pdoe = ecn_add_child_type( pdo, ECNT_PDO_ENTRY )) )
++                            return 0;;
++                        pdoe->nr = l;
++                        memcpy( &pdoe->pdo_entry_t, &pdo_entry, sizeof(ec_pdo_entry_info_t) );
++
++    #if PRINT_PHYS_CONFIG
++                        pinfo( "            Entry %d: index 0x%04x, subindex %d, bit length %d\n",
++                                l,
++                                pdo_entry.index,
++                                pdo_entry.subindex,
++                                pdo_entry.bit_length
++                             );
++    #endif
++                    }
+ 
+-	            }
++                }
+ 
+-	        }
++            }
+ 
+-	        continue;
+-    	}
++            continue;
++        }
+ 
+ 
+ 
+         for( j = 0; j < sync_count; j++ )
+         {
+-        	if( !(sm = ecn_add_child_type( slave, ECNT_SYNC )) )
+-        		return 0;
+-        	sm->nr = j;
+-        	if( ecrt_master_get_sync_manager( ecm, i, j, &sm->sync_t ) )
+-            	perrret( "%s: cannot get slave %d, sync mgr %d info\n", __func__, i, j );
++            if( !(sm = ecn_add_child_type( slave, ECNT_SYNC )) )
++                return 0;
++            sm->nr = j;
++            if( ecrt_master_get_sync_manager( ecm, i, j, &sm->sync_t ) )
++                perrret( "%s: cannot get slave %d, sync mgr %d info\n", __func__, i, j );
+ 
+             pdo_count = sm->sync_t.n_pdos;
+ 
+@@ -179,11 +285,11 @@ int master_create_physical_config( ecnode *m )
+ 
+             for( k = 0; k < pdo_count; k++ )
+             {
+-            	if( !(pdo = ecn_add_child_type( sm, ECNT_PDO )) )
+-            			return 0;
+-            	pdo->nr = k;
++                if( !(pdo = ecn_add_child_type( sm, ECNT_PDO )) )
++                        return 0;
++                pdo->nr = k;
+                 if( ecrt_master_get_pdo( ecm, i, j, k, &pdo->pdo_t ) )
+-                	perrret( "%s: cannot get slave %d, sync mgr %d, pdo %d info\n", __func__, i, j, k );
++                    perrret( "%s: cannot get slave %d, sync mgr %d, pdo %d info\n", __func__, i, j, k );
+ 
+                 entry_count = pdo->pdo_t.n_entries;
+ 
+@@ -198,15 +304,15 @@ int master_create_physical_config( ecnode *m )
+                 for( l = 0; l < entry_count; l++ )
+                 {
+                     if( ecrt_master_get_pdo_entry( ecm, i, j, k, l, &pdo_entry )  )
+-                    	perrret( "%s: cannot get slave %d, sync mgr %d, pdo %d, pdoe_entry %d info\n", __func__, i, j, k, l );
++                        perrret( "%s: cannot get slave %d, sync mgr %d, pdo %d, pdoe_entry %d info\n", __func__, i, j, k, l );
+ 
+                     if( !pdo_entry.index )
+-						continue;
++                        continue;
+ 
+                     if( !(pdoe = ecn_add_child_type( pdo, ECNT_PDO_ENTRY )) )
+-                    	return 0;;
+-                	pdoe->nr = l;
+-                	memcpy( &pdoe->pdo_entry_t, &pdo_entry, sizeof(ec_pdo_entry_info_t) );
++                        return 0;;
++                    pdoe->nr = l;
++                    memcpy( &pdoe->pdo_entry_t, &pdo_entry, sizeof(ec_pdo_entry_info_t) );
+ 
+ #if PRINT_PHYS_CONFIG
+                     pinfo( "            Entry %d: index 0x%04x, subindex %d, bit length %d\n",
+@@ -235,22 +341,22 @@ int master_create_physical_config( ecnode *m )
+ 
+ 
+ void ecn_count_pdo_entries(
+-	ecnode *node,
+-	int *count
++    ecnode *node,
++    int *count
+ )
+ {
+-	if( !node || !count )
+-		return;
++    if( !node || !count )
++        return;
+ 
+-	do
+-	{
+-		if( node->child )
+-			ecn_count_pdo_entries( node->child, count );
++    do
++    {
++        if( node->child )
++            ecn_count_pdo_entries( node->child, count );
+ 
+-		if( node->type == ECNT_PDO_ENTRY )
+-			if( node->pdo_entry_t.index && node->pdo_entry_t.bit_length )
+-				(*count)++;
+-	} while( (node = node->next) );
++        if( node->type == ECNT_PDO_ENTRY )
++            if( node->pdo_entry_t.index && node->pdo_entry_t.bit_length )
++                (*count)++;
++    } while( (node = node->next) );
+ 
+ }
+ 
+@@ -261,78 +367,89 @@ int domain_create_autoconfig( ecnode *d )
+     int ix = 0, ndc = 0;
+     ecnode *m = d->ddata.nmaster;
+     ecnode *slave, *sync, *pdo, *pdo_entry, *dom_entry;
+-	ec_pdo_entry_reg_t *dc;
++    ec_pdo_entry_reg_t *dc;
+ 
+-	d->ddata.dcfgtype = DCT_NOT_CONFIGURED;
+-	pinfo( PPREFIX  "%s: Autoconfiguring domain...\n", __func__ );
++    d->ddata.dcfgtype = DCT_NOT_CONFIGURED;
++    pinfo( PPREFIX  "%s: Autoconfiguring domain...\n", __func__ );
+ 
+-	ecn_count_pdo_entries( ecn_get_child_nr_type( ecroot, 0, ECNT_MASTER ), &ndc );
+-	if( !ndc )
+-		perrret( "%s: No PDO entries found, cancelling autoconfig domain\n", __func__ );
++    ecn_count_pdo_entries( ecn_get_child_nr_type( ecroot, 0, ECNT_MASTER ), &ndc );
++    if( !ndc )
++        perrret( "%s: No PDO entries found, cancelling autoconfig domain\n", __func__ );
+ 
+     if( !(d->ddata.regs = (ec_pdo_entry_reg_t *)calloc( ndc+1, sizeof(ec_pdo_entry_reg_t) )) )
+         perrret( "%s: Memory allocation for domain config failed\n", __func__ );
+     if( !(d->ddata.reginfos = (domain_reg_info *)calloc( ndc+1, sizeof(domain_reg_info) )) )
+         perrret( "%s: Memory allocation for domain config failed\n", __func__ );
+-	d->ddata.num_of_regs = ndc;
++    d->ddata.num_of_regs = ndc;
+ 
+-	slave = m->child;
++    slave = m->child;
+ 
+-	walk( slave, m )
++    walk( slave, m )
+     {
+ 
+         if( !slave->child )
+-        	continue;
++            continue;
+ 
+         walk( sync, slave )
+         {
+             if( !sync->child )
+-            	continue;
+-
+-        	walk( pdo, sync )
++                continue;
++	    printf("DEBUG: Domain %d sees slave %d sync %d direction=%d\n",
++		   d->nr, slave->nr, sync->nr, sync->sync_t.dir);
++             /* Split by direction: domain 0 = outputs (SM2), domain 1 = inputs (SM3) */
++/* Correct split using IgH direction values:
++   IgH: dir = 1 (Output), dir = 0 (Input) */
++	    if ((d->nr == 0 && sync->sync_t.dir != 1) ||   /* SM2 is Output */
++		(d->nr == 1 && sync->sync_t.dir != 2))     /* SM3 is Input  */
++	      continue;
++	    
++            walk( pdo, sync )
+             {
+-            	if( !pdo->child )
+-            		continue;
++                if( !pdo->child )
++                    continue;
+ 
+                 walk( pdo_entry, pdo )
+                 {
+-                	if( !pdo_entry->pdo_entry_t.index )
+-                		continue;
+-
+-
+-                	dc = &d->ddata.regs[ix];
+-					dc->alias 			= slave->slave_t.alias;
+-					dc->position 		= slave->slave_t.position;
+-					dc->vendor_id		= slave->slave_t.vendor_id;
+-					dc->product_code 	= slave->slave_t.product_code;
+-					dc->index 			= pdo_entry->pdo_entry_t.index;
+-					dc->subindex 		= pdo_entry->pdo_entry_t.subindex;
+-					dc->offset 			= &d->ddata.reginfos[ix].byte;
+-					dc->bit_position 	= &d->ddata.reginfos[ix].bit;
+-
+-			    	dom_entry = ecn_add_child_type( d, ECNT_DOMAIN_ENTRY );
+-			    	dom_entry->nr = ix;
+-
+-					dom_entry->de_master 	 = d->ddata.reginfos[ix].master    = m;
+-					dom_entry->de_domain 	 = d->ddata.reginfos[ix].domain    = d;
+-					dom_entry->de_slave 	 = d->ddata.reginfos[ix].slave     = slave;
+-					dom_entry->de_sync 	     = d->ddata.reginfos[ix].sync      = sync;
+-					dom_entry->de_pdo 		 = d->ddata.reginfos[ix].pdo       = pdo;
+-					dom_entry->de_pdo_entry  = d->ddata.reginfos[ix].pdo_entry = pdo_entry;
+-					d->ddata.reginfos[ix].bit_length = pdo_entry->pdo_entry_t.bit_length;
+-
+-			    	pdo_entry->domain_entry =
+-			    	d->ddata.reginfos[ix].domain_entry = dom_entry;
+-
+-					ix++;
++                    if( !pdo_entry->pdo_entry_t.index )
++                        continue;
++
++
++                    dc = &d->ddata.regs[ix];
++                    dc->alias             = slave->slave_t.alias;
++                    dc->position         = slave->slave_t.position;
++                    dc->vendor_id        = slave->slave_t.vendor_id;
++                    dc->product_code     = slave->slave_t.product_code;
++                    dc->index             = pdo_entry->pdo_entry_t.index;
++                    dc->subindex         = pdo_entry->pdo_entry_t.subindex;
++                    dc->offset             = &d->ddata.reginfos[ix].byte;
++                    dc->bit_position     = &d->ddata.reginfos[ix].bit;
++
++                    dom_entry = ecn_add_child_type( d, ECNT_DOMAIN_ENTRY );
++                    dom_entry->nr = ix;
++
++                    dom_entry->de_master      = d->ddata.reginfos[ix].master    = m;
++                    dom_entry->de_domain      = d->ddata.reginfos[ix].domain    = d;
++                    dom_entry->de_slave      = d->ddata.reginfos[ix].slave     = slave;
++                    dom_entry->de_sync          = d->ddata.reginfos[ix].sync      = sync;
++                    dom_entry->de_pdo          = d->ddata.reginfos[ix].pdo       = pdo;
++                    dom_entry->de_pdo_entry  = d->ddata.reginfos[ix].pdo_entry = pdo_entry;
++                    d->ddata.reginfos[ix].bit_length = pdo_entry->pdo_entry_t.bit_length;
++
++                    pdo_entry->domain_entry =
++                    d->ddata.reginfos[ix].domain_entry = dom_entry;
++
++                    ix++;
+                 }
+             }
+         }
+ 
+     }
+-	d->ddata.dcfgtype = DCT_CONFIGURED | DCT_AUTOCONFIG;
++    d->ddata.dcfgtype = DCT_CONFIGURED | DCT_AUTOCONFIG;
+ 
+ 
++     /* Critical: use the actual number of filled regs to avoid over-iteration */
++     d->ddata.num_of_regs = ix;
++ 
+     return ix;
+ }
+ 
+@@ -342,89 +459,73 @@ int domain_create_autoconfig( ecnode *d )
+ 
+ ecnode *add_domain( ecnode *m, int rate )
+ {
+-	int retv, nr = ecn_get_first_free_child_nr_type( m, ECNT_DOMAIN );
+-	int size, nregs;
+-	ecnode *d = ecn_add_child_type( m, ECNT_DOMAIN );
+-	if( !d )
+-		perrret( "%s: failed", __func__ );
++    int retv, nr = ecn_get_first_free_child_nr_type( m, ECNT_DOMAIN );
++    int size, nregs;
++    ecnode *d = ecn_add_child_type( m, ECNT_DOMAIN );
++    if( !d )
++        perrret( "%s: failed", __func__ );
+ 
+-	d->nr = nr;
+-	d->ddata.nmaster = m;
+-	d->ddata.dmem = d->ddata.rmem = d->ddata.wmem = NULL;
++    d->nr = nr;
++    d->ddata.nmaster = m;
++    d->ddata.dmem = d->ddata.rmem = d->ddata.wmem = NULL;
+ 
+-	if( !(d->domain_t = ecrt_master_create_domain( m->mdata.master )) )
++    if( !(d->domain_t = ecrt_master_create_domain( m->mdata.master )) )
+         perrret( "%s: Domain creation failed!\n", __func__ );
+ 
+     pinfo( PPREFIX "%s: Domain %d creation succeeded\n", __func__, d->nr );
+ 
+     if( !(nregs = domain_create_autoconfig( d )) )
+         return 0;
+-	pinfo( PPREFIX "Domain %d: Autoconfig found %d entries\n", d->nr, nregs );
++    pinfo( PPREFIX "Domain %d: Autoconfig found %d entries\n", d->nr, nregs );
+ 
+ #if 0
+-	int i;
+-	for( i = 0; i < nregs; i++ )
+-	{
+-		printf( "%d.  alias %d, pos %d, vendor 0x%x, pcode 0x%x, 0x%04x:%02x, blen=%d\n",
+-				i,
+-				d->ddata.regs[i].alias,
+-				d->ddata.regs[i].position,
+-				d->ddata.regs[i].vendor_id,
+-				d->ddata.regs[i].product_code,
+-				d->ddata.regs[i].index,
+-				d->ddata.regs[i].subindex,
+-				d->ddata.reginfos[i].bit_length
+-				);
+-	}
++    int i;
++    for( i = 0; i < nregs; i++ )
++    {
++        printf( "%d.  alias %d, pos %d, vendor 0x%x, pcode 0x%x, 0x%04x:%02x, blen=%d\n",
++                i,
++                d->ddata.regs[i].alias,
++                d->ddata.regs[i].position,
++                d->ddata.regs[i].vendor_id,
++                d->ddata.regs[i].product_code,
++                d->ddata.regs[i].index,
++                d->ddata.regs[i].subindex,
++                d->ddata.reginfos[i].bit_length
++                );
++    }
+ #endif
+-	retv = ecrt_domain_reg_pdo_entry_list( d->domain_t, d->ddata.regs );
+-	if( retv)
+-		perrret( "%s: ecrt_domain_reg_pdo_entry_list failed!\n", __func__ );
++    retv = ecrt_domain_reg_pdo_entry_list( d->domain_t, d->ddata.regs );
++    if( retv)
++        perrret( "%s: ecrt_domain_reg_pdo_entry_list failed!\n", __func__ );
+ 
+-	size = ecrt_domain_size( d->domain_t );
+-	if( size <= 0 )
+-		perrret( "%s: ecrt_domain_size() returned %s value %d\n", __func__, !size ? "zero" : "negative", size );
++    size = ecrt_domain_size( d->domain_t );
++    if( size <= 0 )
++        perrret( "%s: ecrt_domain_size() returned %s value %d\n", __func__, !size ? "zero" : "negative", size );
+ 
+-	d->ddata.dsize = size;
+-	if( size % EC_PAGE_SIZE )
+-		size += (EC_PAGE_SIZE - size % EC_PAGE_SIZE);
+-	d->ddata.dallocated = size;
++    d->ddata.dsize = size;
++    if( size % EC_PAGE_SIZE )
++        size += (EC_PAGE_SIZE - size % EC_PAGE_SIZE);
++    d->ddata.dallocated = size;
+ 
+ 
+ #ifdef DOMAIN_EXT_MEM
+-	if( !(d->ddata.dmem = (char *)calloc( 1, size )) )
++    if( !(d->ddata.dmem = (char *)calloc( 1, size )) )
+         perrret( "%s: memory allocation for domain config failed\n", __func__ );
+ #endif
+-	if( !(d->ddata.rmem = (char *)calloc( 1, size )) )
++    
++    if( !(d->ddata.rmem = (char *)calloc( 1, size )) )
+         perrret( "%s: memory allocation for domain config failed\n", __func__ );
+     if( !(d->ddata.wmem = (char *)calloc( 1, size )) )
+         perrret( "%s: memory allocation for domain config failed\n", __func__ );
+-/*	pinfo( "%s: domain size %d bytes (allocated %d pages, %d bytes)\n", __func__, d->ddata.dsize, size/EC_PAGE_SIZE, size ); */
++/*    pinfo( "%s: domain size %d bytes (allocated %d pages, %d bytes)\n", __func__, d->ddata.dsize, size/EC_PAGE_SIZE, size ); */
+ 
+ 
+ #ifdef DOMAIN_EXT_MEM
+-	ecrt_domain_external_memory( d->domain_t, d->ddata.dmem );
+-#endif
+-
+-	/*domain_print_autoconfig( d ); */
+-	d->ddata.rate = rate;
+-
+-#if 1
+-    if( ecrt_master_activate( m->mdata.master ) )
+-		perrret( "Master %d activation failed\n", m->nr );
+-
+-/*    st_start( 0 ); */
+-
+-#ifndef DOMAIN_EXT_MEM
+-	d->ddata.dmem = (char *)ecrt_domain_data( d->domain_t );
++    ecrt_domain_external_memory( d->domain_t, d->ddata.dmem );
+ #endif
+ 
+-#endif
+-
+-	if( !d->ddata.dmem )
+-		perrret( "%s: cannot get or allocate domain memory\n", __func__ );
+-
++    /*domain_print_autoconfig( d ); */
++    d->ddata.rate = rate;
+ 
+     return d;
+ }
+-
 diff --git ecengine.c ecengine.c
 index 6929166..2d31119 100644
 --- ecengine.c

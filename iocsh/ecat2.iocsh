@@ -4,5 +4,6 @@
 #- ECAT_FREQ     - EtherCAT update frequency in Hz
 #-#############################################################################
 
-ecat2configure(0, $(ECAT_FREQ), 0, 1)
+ecat2configure(0, $(ECAT_FREQ), 1, 0)
+ecat2configure(1, $(ECAT_FREQ), 1, 1)
 installLastResortEventProvider
