@@ -1,24 +1,43 @@
 diff --git devethercat.c devethercat.c
-index bf8a7da..c19d1bd 100644
+index bf8a7da..d1a8be4 100644
 --- devethercat.c
 +++ devethercat.c
-@@ -1180,7 +1180,7 @@ static int init_aa( devethercat_private *priv, aaiRecord *record, RECTYPE rectyp
+@@ -598,7 +598,9 @@ int dev_parse_io_string( devethercat_private *priv, dbCommon *record, RECTYPE re
+ 		errlogSevPrintf( errlogFatal, "%s: record, reclink or rectype invalid\n", __func__ );
+ 		return S_dev_badArgument;
+ 	}
+-
++	/* reclink->text has never been set */
++	reclink->text = reclink->value.constantStr;
++	
+ 	if( !reclink->text )
+ 	{
+ 		errlogSevPrintf( errlogFatal, "%s: INP/OUT string NULL\n", __func__ );
+@@ -1179,15 +1181,15 @@ static int init_aa( devethercat_private *priv, aaiRecord *record, RECTYPE rectyp
  
  
- #define PARSE_IO_STR( rtype, inout )                                                                         \
+ 
+-#define PARSE_IO_STR( rtype, inout )                                                                         \
 -reclink = &((rtype##Record *)record)->inout;                                                               \
-+reclink = &((rtype##Record *)record)->inout;									\
- if( dev_parse_io_string( priv, record, rectype, reclink ) != OK )                                            \
- {                                                                                                            \
- 	errlogSevPrintf( errlogFatal, "%s: Parsing INP/OUT link '%s' failed (record %s, type %s)\n", __func__,   \
-@@ -1201,6 +1201,7 @@ long dev_init_record(
-   			boffs[32] = { 0 }, blen[32] = { 0 }, *msg;
-   	RECTYPE rectype = dev_get_record_type( record, &ix );
- 	FN_CALLED;
-+        errlogSevPrintf( errlogInfo, "%s: record %s of type '%s'\n", __func__, record->name, rectypes[ix].recname );
+-if( dev_parse_io_string( priv, record, rectype, reclink ) != OK )                                            \
+-{                                                                                                            \
+-	errlogSevPrintf( errlogFatal, "%s: Parsing INP/OUT link '%s' failed (record %s, type %s)\n", __func__,   \
+-			reclink->text, record->name, rectypes[ix].recname );                                             \
+-	free( priv );                                                                                            \
+-	record->dpvt = NULL;                                                                                     \
+-	return ERR_BAD_ARGUMENT;																				\
++#define PARSE_IO_STR( rtype, inout )                                                                           \
++reclink = &((rtype##Record *)record)->inout;                                                                   \
++if( dev_parse_io_string( priv, record, rectype, reclink ) != OK )                                              \
++{                                                                                                              \
++	errlogSevPrintf( errlogFatal, "%s: Parsing INP/OUT link '%s' failed (record %s, type %s)\n", __func__, \
++			reclink->text, record->name, rectypes[ix].recname );                                   \
++	free( priv );                                                                                          \
++	record->dpvt = NULL;                                                                                   \
++	return ERR_BAD_ARGUMENT;									       \
+ }
  
-   	if( rectype == REC_ERROR )
-     {
+ long dev_init_record(
 diff --git drvethercat.c drvethercat.c
 index 12c2054..517d431 100644
 --- drvethercat.c
