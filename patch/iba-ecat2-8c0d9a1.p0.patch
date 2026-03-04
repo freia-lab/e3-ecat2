@@ -39,7 +39,7 @@ index bf8a7da..d1a8be4 100644
  
  long dev_init_record(
 diff --git drvethercat.c drvethercat.c
-index 12c2054..517d431 100644
+index 12c2054..5e388b0 100644
 --- drvethercat.c
 +++ drvethercat.c
 @@ -28,13 +28,15 @@
@@ -895,8 +895,12 @@ index 12c2054..517d431 100644
  static const iocshArg * const drvethercatDMapArgs[] = {
      &drvethercatDMapArg0,
  };
-@@ -604,7 +633,7 @@ static void drvethercatDMapFunc( const iocshArgBuf *args )
- /* stat                  */
+@@ -601,20 +630,20 @@ static void drvethercatDMapFunc( const iocshArgBuf *args )
+ 
+ /*---------------------- */
+ /*                       */
+-/* stat                  */
++/* ecstat                  */
  /*                       */
  /*---------------------- */
 -static const iocshArg drvethercatstatArg0 = { "dnr", 		iocshArgInt };
@@ -904,6 +908,18 @@ index 12c2054..517d431 100644
  static const iocshArg * const drvethercatstatArgs[] = {
      &drvethercatstatArg0
  };
+ 
+ static const iocshFuncDef drvethercatstatDef =
+-    { "stat", 1, drvethercatstatArgs };
++    { "ecstat", 1, drvethercatstatArgs };
+ 
+ static void drvethercatStatFunc( const iocshArgBuf *args )
+ {
+-    stat(
++    ecstat(
+         args[0].ival
+     );
+ }
 @@ -626,9 +655,9 @@ static void drvethercatStatFunc( const iocshArgBuf *args )
  /*                       */
  /*---------------------- */
@@ -4406,4 +4422,47 @@ index 1940a67..3ab462f 100644
 +/****************************************************************************/
  
  /** @} */
+ 
+diff --git ectools.c ectools.c
+index 4965539..b77aa04 100644
+--- ectools.c
++++ ectools.c
+@@ -601,20 +601,20 @@ int ect_print_stats( int dnr )
+ }
+ 
+ 
+-long stat( int dnr )
++long ecstat( int dnr )
+ {
+     if( dnr < 0 )
+     {
+         printf( "----------------------------------------------------------------------------------\n" );
+-        printf( "Usage: stat [domain_nr]\n\n");
++        printf( "Usage: ecstat [domain_nr]\n\n");
+         printf( " Argument        Desc\n");
+         printf( " domain_nr       Number of the corresponding EtherCAT domain\n");
+         printf( " \nExamples:\n");
+-        printf( " stat\n");
+-        printf( " stat 0\n");
++        printf( " ecstat\n");
++        printf( " ecstat 0\n");
+         printf( "----------------------------------------------------------------------------------\n" );
+ 
+-        printf( "\n***** ecat2 driver called with stat %d\n", dnr );
++        printf( "\n***** ecat2 driver called with ecstat %d\n", dnr );
+         return 0;
+     }
+ 
+diff --git ectools.h ectools.h
+index 287df4e..c901d94 100644
+--- ectools.h
++++ ectools.h
+@@ -53,7 +53,7 @@ int get_pdo_info_6692( ec_master_t *ecm, int i, int j, int k, ec_pdo_info_t *pdo
+ int get_pdo_entry_info_6692( ec_master_t *ecm, int i, int j, int k, int l, ec_pdo_entry_info_t *pdo_entry_t );
+ 
+ long dmap( char *cmd );
+-long stat( int dnr );
++long ecstat( int dnr );
+ 
+ long sts( char *from, char *to );
  
